@@ -36,9 +36,10 @@ sudo systemctl restart containerd
 # 7. Install Kubernetes components
 sudo apt install -y apt-transport-https ca-certificates curl gpg
 
-curl -fsSL [https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key](https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key) | sudo tee /etc/apt/trusted.gpg.d/kubernetes-apt-keyring.asc > /dev/null
+sudo mkdir -p /etc/apt/keyrings
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key | sudo tee /etc/apt/keyrings/kubernetes-apt-keyring.asc > /dev/null
 
-echo 'deb [signed-by=/etc/apt/trusted.gpg.d/kubernetes-apt-keyring.asc] [https://pkgs.k8s.io/core:/stable:/v1.29/deb/](https://pkgs.k8s.io/core:/stable:/v1.29/deb/) /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+echo 'deb [trusted=yes signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.asc] https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
 
 sudo apt update
 sudo apt install -y kubelet kubeadm kubectl
@@ -48,7 +49,7 @@ sudo apt-mark hold kubelet kubeadm kubectl
 ### Master Node
 
 ```bash
-# 1. Initialize the cluster
+# 1. Initialize the cluster (private ip)
 sudo kubeadm init --apiserver-advertise-address=<Master-IP> --pod-network-cidr=172.29.0.0/16
 
 # 2. Setup kubeconfig for kubectl
