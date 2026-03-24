@@ -2,14 +2,9 @@
 
 ## OSI Network Layers for DevOps
 
-
-
 [Image of OSI model layers]
 
-
 ### Data Link (Layer 2)
-
-
 
 * **Think of this as:** The physical street addresses of houses on the same block.
 * Layer 2 is concerned purely with moving data across a **local physical link**. It does not know what the internet is, and it does not know what an IP address is.
@@ -19,8 +14,6 @@
 
 ### Network Layer (Layer 3)
 
-
-
 * **Think of this as:** The Zip Codes and City names that allow a letter to travel from New York to Tokyo.
 * Layer 3 introduces the concept of **logical routing** across multiple, different networks.
 * **The Address:** It uses **IP addresses** (e.g., `192.168.1.5` or `10.96.0.1`).
@@ -28,8 +21,6 @@
 * **In Linux:** `iptables` (the Linux firewall) is primarily a Layer 3 tool. It looks at the Source IP and Destination IP of a packet to decide whether to block it, allow it, or translate it (NAT).
 
 ### Transport (Layer 4)
-
-
 
 * **Think of this as:** The name of the specific person inside the house who the letter is for.
 * Once Layer 3 gets the data to the correct computer, Layer 4 figures out **which application** on that computer should receive it.
@@ -39,8 +30,6 @@
 ---
 
 ## Bridge
-
-
 
 Historically, a hardware bridge was used to connect two separate network segments (like two different physical wires of computers) to make them act like one big network.
 
@@ -58,7 +47,7 @@ Historically, a hardware bridge was used to connect two separate network segment
 
 ## Why Do DevOps Engineers Care? (The Virtual Bridge)
 
-Because in the world of Linux, Docker, and Kubernetes, we use **Virtual Software Bridges**. 
+Because in the world of Linux, Docker, and Kubernetes, we use **Virtual Software Bridges**.
 
 When you install Docker on a Linux server, Docker creates a virtual network interface called `docker0`.
 

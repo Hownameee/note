@@ -1,8 +1,7 @@
 # Docker Swarm (Docker's Native Container Orchestration Tool)
 
-
-
 Docker Swarm is a container orchestration tool built directly into Docker. Key characteristics include:
+
 * **Ease of Use:** It is straightforward to install, lightweight, and easy to use.
 * **Built-in Automation:** It provides automated load balancing within your Docker containers.
 * **Limitations:** However, it is worth noting that its automation capabilities are **not as robust as those offered by Kubernetes**.
@@ -11,7 +10,7 @@ Docker Swarm is a container orchestration tool built directly into Docker. Key c
 
 ## Why Was It Born?
 
-Before orchestration tools, the main "pain" in DevOps was managing containers at scale. 
+Before orchestration tools, the main "pain" in DevOps was managing containers at scale.
 
 * **The Scale Problem:** What happens when your application needs 50 containers spread across 10 different servers for high availability?
 * **Manual Nightmare:** Engineers had to manually SSH into different servers, start containers, manage port conflicts, and stitch them together with external load balancers.
@@ -20,8 +19,6 @@ Before orchestration tools, the main "pain" in DevOps was managing containers at
 ---
 
 ## How It Works
-
-
 
 Docker Swarm operates on a **Manager-Worker architecture** (similar in concept to Jenkins master/agent nodes).
 
@@ -58,13 +55,11 @@ docker service scale demo-web=10
 
 ## How Load Balancing Works
 
-
-
-In a typical production setup, there will be an external proxy (like HAProxy, NGINX, or AWS ALB) sitting in front of the Swarm, distributing traffic across all Swarm nodes. 
+In a typical production setup, there will be an external proxy (like HAProxy, NGINX, or AWS ALB) sitting in front of the Swarm, distributing traffic across all Swarm nodes.
 
 ![View](./swarm.png)
 
-### The Request Lifecycle:
+### The Request Lifecycle
 
 1. **Step 1: The Client hits a Node IP.** The client types your URL or IP address into their browser. That request reaches the physical (or virtual) network interface of **any node** in your Swarm cluster on the published port (e.g., port `8080`). It literally does not matter if the node receiving the request is a Manager, a Worker, or whether it even has your container running on it.
 2. **Step 2: The Ingress Network intercepts.**

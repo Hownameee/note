@@ -49,7 +49,7 @@ sudo apt-mark hold kubelet kubeadm kubectl
 ### Master Node
 
 ```bash
-# 1. Initialize the cluster (private ip)
+# 1. Initialize the cluster (private ip because master and workers usually in the same network)
 sudo kubeadm init --apiserver-advertise-address=<Master-IP> --pod-network-cidr=172.29.0.0/16
 
 # 2. Setup kubeconfig for kubectl
@@ -77,7 +77,7 @@ sudo kubeadm join <Master-IP>:6443 --token <token> --discovery-token-ca-cert-has
 
 ### Disable Swap
 
-Kubernetes assigns "Quality of Service" (QoS) classes to Pods to ensure they get the exact RAM they requested. If Linux starts moving memory pages to a hard drive swap file, K8s loses its ability to accurately measure and enforce memory limits. It literally refuses to start if swap is on. 
+Kubernetes assigns "Quality of Service" (QoS) classes to Pods to ensure they get the exact RAM they requested. If Linux starts moving memory pages to a hard drive swap file, K8s loses its ability to accurately measure and enforce memory limits. It literally refuses to start if swap is on.
 
 This means when you deploy a Pod, you can specify how much RAM it **Requests** (what it needs to start) and its **Limit** (the absolute maximum it is allowed to use). Based on these numbers, Kubernetes assigns the Pod one of three Quality of Service (QoS) classes:
 
@@ -86,6 +86,7 @@ This means when you deploy a Pod, you can specify how much RAM it **Requests** (
 * **BestEffort:** The Pod didn't specify any limits. It gets whatever is left over. If the server runs out of memory, these are the first Pods to be killed.
 
 **The Swap Problem:**
+
 * If Swap is enabled, the Linux kernel essentially "lies" to Kubernetes (when memory is full).
 * K8s might think a Guaranteed Pod is happily using its 1GB of RAM.
 * But under the hood, Linux might have swapped 500MB of that Pod's memory to the hard drive.
@@ -132,6 +133,7 @@ To understand why we change this setting, you need to understand how Linux limit
 When you tell Kubernetes, "This Pod is only allowed to use 1GB of RAM," Kubernetes doesn't actually enforce that. It tells `containerd` to do it, and `containerd` uses Linux cgroups to build a microscopic "fence" around the container.
 
 **Here is where the problem starts:**
+
 * **The Linux OS Manager (`systemd`):** Almost all modern Linux distributions (like Ubuntu, CentOS) use a program called `systemd` to boot the system and act as the master manager of these cgroups.
 * **The Container Manager (`cgroupfs`):** By default, `containerd` comes out of the box using a completely different, older cgroup manager called `cgroupfs`.
 

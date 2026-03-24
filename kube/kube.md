@@ -1,7 +1,5 @@
 # Kubernetes (K8s)
 
-
-
 ## What is Kubernetes?
 
 Kubernetes is an open-source container orchestration system used to **automate the deployment, scaling, and management of containerized applications**. It was originally **developed by Google** based on their years of experience running containers at a massive scale (under the internal project name Borg). Today, Kubernetes has a massive, active development community and is maintained by the **CNCF** (Cloud Native Computing Foundation).
@@ -19,9 +17,7 @@ As applications transitioned from monolithic designs to microservices, managing 
 
 ## How It Works
 
-
-
-Kubernetes operates on a distinct client-server architecture consisting of two main parts: the **Control Plane** (Master Nodes) and the **Worker Nodes**. 
+Kubernetes operates on a distinct client-server architecture consisting of two main parts: the **Control Plane** (Master Nodes) and the **Worker Nodes**.
 
 ![view](./kube.png)
 
@@ -42,8 +38,6 @@ The Control Plane is the "brain" of the cluster. It makes global decisions about
 
 ## Worker Node
 
-
-
 If the Control Plane is the brain, the Worker Nodes are the muscle. These are the physical or virtual servers that do the actual heavy lifting and run your application code.
 
 * **Kubelet:** The primary "captain" or agent running on each node. It ensures that containers are running and healthy inside their Pods. It constantly reports the node's status back to the Control Plane's API Server.
@@ -55,8 +49,6 @@ If the Control Plane is the brain, the Worker Nodes are the muscle. These are th
 ---
 
 ## Core Components (Objects)
-
-
 
 To effectively deploy applications, Kubernetes uses a hierarchy of API objects to manage your containers:
 
