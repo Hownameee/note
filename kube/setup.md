@@ -142,3 +142,7 @@ If you don't run that `sed` command, you will have two different managers (`syst
 
 **The Solution:**
 By changing `SystemdCgroup = true`, you are forcing `containerd` to surrender its resource management to `systemd`. This ensures that the Linux kernel, the Kubernetes `kubelet`, and `containerd` are all using the exact same "boss" to manage CPU and RAM.
+
+**Temp**
+
+kubeadm join 192.168.1.14:6443 --token glluvh.jsfotd3wkcvaxew2 --discovery-token-ca-cert-hash sha256:6b60588211dcffef721ea9c6368e3fb6657b9a4fa51b01fa54c429088ea33f0b
