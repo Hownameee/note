@@ -1,0 +1,100 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mega-nginx-pod
+  namespace: my-workspace      # (Tùy chọn) Chỉ định phòng ban chứa Pod này
+  labels:                      # (Rất quan trọng) Gắn thẻ để Service hoặc Deployment dễ dàng tìm thấy Pod này
+    app: web-server
+    environment: production
+  annotations:                 # (Tùy chọn) Ghi chú thêm thông tin cho con người hoặc các tool bên thứ 3 đọc
+    owner: "DevTeam-A"
+
+spec:
+  # ==========================================
+  # 1. SCHEDULING (Điều phối & Xếp chỗ)
+  # ==========================================
+  nodeName: worker-node-2      # (Hiếm dùng) Ép cứng Pod chạy trên Node này
+  nodeSelector:                # (Hay dùng) Chỉ chạy trên các Node có gắn nhãn "disktype=ssd"
+    disktype: ssd
+  tolerations:                 # (Nâng cao) Cho phép Pod chạy trên các Node bị "đánh dấu độc" (Taint)
+  - key: "key1"
+    operator: "Equal"
+    value: "value1"
+    effect: "NoSchedule"
+  affinity:                    # (Rất nâng cao) Luật hấp dẫn: Ép Pod này phải chạy gần (hoặc xa) một Pod khác
+
+  # ==========================================
+  # 2. VÒNG ĐỜI & MẠNG (Lifecycle & Network)
+  # ==========================================
+  restartPolicy: Always        # Always (mặc định), OnFailure (chỉ khởi động lại nếu lỗi), Never (chết là thôi)
+  hostNetwork: false           # Nếu true: Pod sẽ dùng chung IP thật của Node (rất nguy hiểm, ít dùng)
+  dnsPolicy: ClusterFirst      # Cách Pod phân giải tên miền (ClusterFirst, Default, None)
+
+  # ==========================================
+  # 3. CONTAINERS (Phần lõi - Nơi ứng dụng chạy)
+  # ==========================================
+  initContainers:              # Container chạy MỘT LẦN duy nhất và phải chạy XONG thì container chính mới được chạy (Dùng để setup DB, tải config...)
+  - name: init-myservice
+    image: busybox:1.28
+    command: ['sh', '-c', 'echo "Đang chuẩn bị dữ liệu..."']
+
+  containers:
+  - name: nginx-main           # Tên của container (1 Pod có thể có nhiều container chạy song song)
+    image: nginx:latest        # Tên image tải từ Docker Hub
+    imagePullPolicy: IfNotPresent # Always (Luôn tải lại), IfNotPresent (Có rồi thì thôi), Never (Không bao giờ tải)
+    
+    # QUẢN LÝ TÀI NGUYÊN (Bắt buộc trong Production)
+    resources:
+      requests:                # Mức tối thiểu K8s phải cấp để container này khởi động
+        memory: "64Mi"
+        cpu: "250m"            # 250m = 1/4 Core CPU
+      limits:                  # Mức tối đa container được phép xài (vượt quá sẽ bị Kubelet "giết" - OOMKilled)
+        memory: "128Mi"
+        cpu: "500m"
+
+    # MẠNG LƯỚI & BIẾN MÔI TRƯỜNG
+    ports:
+    - containerPort: 80        # Mở cổng 80 bên trong container
+    env:                       # Truyền biến môi trường vào cho ứng dụng
+    - name: DATABASE_URL
+      value: "mysql://localhost:3306"
+    - name: SECRET_PASSWORD
+      valueFrom:               # Lấy mật khẩu từ Kubernetes Secret (Bảo mật)
+        secretKeyRef:
+          name: my-secret
+          key: db-password
+
+    # KIỂM TRA SỨC KHỎE (Health Checks - Rất quan trọng)
+    livenessProbe:             # Kiểm tra xem ứng dụng còn SỐNG không? (Nếu fail -> Kubelet sẽ restart container)
+      httpGet:
+        path: /health
+        port: 80
+      initialDelaySeconds: 15  # Chờ 15s sau khi khởi động mới bắt đầu kiểm tra
+      periodSeconds: 10        # Cứ 10s kiểm tra 1 lần
+    readinessProbe:            # Kiểm tra xem ứng dụng đã SẴN SÀNG nhận khách chưa? (Nếu fail -> Kube-proxy không dẫn traffic vào)
+      tcpSocket:
+        port: 80
+
+    # LƯU TRỮ (Volumes)
+    volumeMounts:              # Gắn ổ đĩa vào đường dẫn bên trong container
+    - name: my-storage-vol
+      mountPath: /usr/share/nginx/html
+    
+  # ==========================================
+  # 4. VOLUMES (Khai báo ổ đĩa vật lý/Logic)
+  # ==========================================
+  volumes:
+  - name: my-storage-vol
+    emptyDir: {}               # Ổ đĩa tạm thời, xóa sạch khi Pod chết
+    # hostPath:                # (Hoặc) Lấy thư mục thật từ máy Worker Node nhét vào
+    #   path: /data/on/worker
+    # persistentVolumeClaim:   # (Hoặc) Ổ cứng mạng an toàn (NFS, Cloud Storage)
+    #   claimName: my-pvc
+
+  # ==========================================
+  # 5. BẢO MẬT & QUYỀN HẠN (Security)
+  # ==========================================
+  serviceAccountName: default  # Cấp cho Pod này một "thẻ nhân viên" để nó có quyền gọi lại API Server
+  securityContext:             # Cấu hình bảo mật cấp độ Pod
+    runAsUser: 1000            # Ép container chạy bằng User ID 1000 (thay vì root ID 0)
+    fsGroup: 2000              # Quyền đọc ghi file

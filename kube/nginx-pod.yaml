@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-pod
+spec:
+  # nodeName: worker-node-2  # Ép K8s bỏ qua việc tự động chọn, nhét thẳng vào máy này
+  containers:
+  - name: nginx
+    image: nginx:latest
+    ports:
+    - containerPort: 80
