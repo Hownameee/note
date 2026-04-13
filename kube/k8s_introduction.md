@@ -19,7 +19,7 @@ As applications transitioned from monolithic designs to microservices, managing 
 
 Kubernetes operates on a distinct client-server architecture consisting of two main parts: the **Control Plane** (Master Nodes) and the **Worker Nodes**.
 
-![view](./kube.png)
+![view](./k8s_general_diagram.png)
 
 ---
 
@@ -32,7 +32,7 @@ The Control Plane is the "brain" of the cluster. It makes global decisions about
 * **Scheduler (`kube-scheduler`):** Watches for newly created Pods that have no assigned node, and selects the most appropriate node for them to run on based on resource requirements, hardware constraints, and affinity rules.
 * **Controller Manager (`kube-controller-manager`):** Runs controller processes in the background. It continuously monitors the state of resources and ensures that the *actual* state of the cluster is always updated to match the *desired* state you asked for (e.g., ensuring 3 replicas of a web server are always running).
 
-![architect](./architect.png)
+![architect](./k8s_architecture_diagram.png)
 
 ---
 
@@ -44,7 +44,7 @@ If the Control Plane is the brain, the Worker Nodes are the muscle. These are th
 * **Container Runtime:** The underlying software used to actually pull images and run the containers. While Docker was historically the default, modern K8s uses runtimes like **containerd** or **CRI-O** that conform to the Container Runtime Interface (CRI).
 * **Kube Proxy:** A network proxy that runs on each node. It maintains network rules (usually via `iptables` or `IPVS`) that allow network communication to your Pods from network sessions inside or outside of your cluster. It essentially provides the load balancing mechanisms for Kubernetes Services.
 
-![container runtime](./container-runtime.png)
+![container runtime](./k8s_container_runtime_diagram.png)
 
 ---
 
@@ -58,4 +58,4 @@ To effectively deploy applications, Kubernetes uses a hierarchy of API objects t
 * **Service:** A stable networking abstraction that provides a single, persistent IP address (VIP) and DNS name to route traffic to a fluctuating set of Pods.
 * **Namespace:** A mechanism to isolate and divide cluster resources between multiple users, teams, or environments (e.g., `dev`, `staging`, `prod`) within a single physical cluster.
 
-![overview](./deployment.png)
+![overview](./k8s_deployment_objects_diagram.png)

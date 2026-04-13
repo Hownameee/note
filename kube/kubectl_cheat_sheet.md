@@ -19,13 +19,13 @@ kubectl delete namespace dev                                 # Xóa Namespace (L
 ## 3. Thao tác với Pod (Triển khai & Quản lý)
 
 ```bash
-kubectl apply -f kube/nginx-pod.yaml                         # Tạo/Cập nhật Pod từ bản vẽ YAML
+kubectl apply -f kube/nginx_pod_example.yaml                         # Tạo/Cập nhật Pod từ bản vẽ YAML
 kubectl get pods                                             # Xem các Pod trong Namespace mặc định hiện tại
 kubectl get pods -n kube-system                              # Xem Pod trong một Namespace cụ thể (VD: kube-system)
 kubectl get pods --all-namespaces                            # Xem toàn bộ Pod trên tất cả các Namespace
 kubectl get pods -A                                          # Gõ tắt của lệnh trên (--all-namespaces)
 kubectl delete pod nginx-pod                                 # Xóa một Pod cụ thể
-kubectl delete -f kube/nginx-pod.yaml                        # Xóa tất cả các tài nguyên được khai báo trong file YAML
+kubectl delete -f kube/nginx_pod_example.yaml                        # Xóa tất cả các tài nguyên được khai báo trong file YAML
 ```
 
 ## 4. Gỡ lỗi & Bắt bệnh (Troubleshooting)

@@ -57,7 +57,7 @@ docker service scale demo-web=10
 
 In a typical production setup, there will be an external proxy (like HAProxy, NGINX, or AWS ALB) sitting in front of the Swarm, distributing traffic across all Swarm nodes.
 
-![View](./swarm.png)
+![View](./docker_swarm_diagram.png)
 
 ### The Request Lifecycle
 
