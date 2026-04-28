@@ -1,0 +1,31 @@
+services:
+
+  backend1:
+    build: ./backend
+    expose:
+      - "8080"
+  
+  backend2:
+    build: ./backend
+    expose:
+      - "8080"
+
+  backend3:
+    build: ./backend
+    expose:
+      - "8080"
+
+  gateway:
+    build: ./gateway
+    ports:
+      - "8080:80"
+    depends_on:
+      - redis
+      - backend1
+      - backend2
+      - backend3
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
