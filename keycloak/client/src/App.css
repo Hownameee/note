@@ -1,0 +1,542 @@
+/* ============================================================
+   APP LAYOUT
+   ============================================================ */
+.app-layout {
+  display: flex;
+  height: 100svh;
+  width: 100%;
+  overflow: hidden;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* ============================================================
+   LEFT PANEL — Auth Flow
+   ============================================================ */
+.flow-panel {
+  width: 360px;
+  min-width: 320px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  background: var(--bg);
+  overflow-y: auto;
+}
+
+.flow-header {
+  padding: 28px 24px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.flow-header h1 {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  margin: 0 0 4px;
+  color: var(--text-h);
+}
+
+.flow-header p {
+  font-size: 13px;
+  color: var(--text);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.flow-steps {
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.step-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  transition: all 0.3s ease;
+  cursor: default;
+}
+
+.step-item.active {
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+}
+
+.step-item.done {
+  opacity: 0.65;
+}
+
+.step-num {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 1px;
+  transition: all 0.3s ease;
+  background: var(--border);
+  color: var(--text);
+}
+
+.step-item.active .step-num {
+  background: var(--accent);
+  color: #fff;
+}
+
+.step-item.done .step-num {
+  background: #22c55e;
+  color: #fff;
+}
+
+.step-content h3 {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0 0 2px;
+  color: var(--text-h);
+}
+
+.step-content p {
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.step-connector {
+  width: 1px;
+  height: 14px;
+  background: var(--border);
+  margin-left: 24px;
+}
+
+.flow-actions {
+  padding: 20px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.btn-login {
+  width: 100%;
+  padding: 12px 20px;
+  border-radius: 10px;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: var(--accent);
+  color: #fff;
+  letter-spacing: 0.2px;
+}
+
+.btn-login:hover {
+  opacity: 0.88;
+  transform: translateY(-1px);
+}
+
+.btn-login:active {
+  transform: translateY(0);
+}
+
+.btn-logout {
+  width: 100%;
+  padding: 12px 20px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: transparent;
+  color: var(--text-h);
+  letter-spacing: 0.2px;
+}
+
+.btn-logout:hover {
+  border-color: #ef4444;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.token-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.token-badge .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #22c55e;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ============================================================
+   RIGHT PANEL — HTTP Log
+   ============================================================ */
+.log-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #0f1117;
+  overflow: hidden;
+}
+
+.log-header {
+  padding: 18px 24px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.log-header h2 {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.85);
+  margin: 0;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.log-clear {
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: transparent;
+  color: rgba(255,255,255,0.5);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.log-clear:hover {
+  color: rgba(255,255,255,0.85);
+  border-color: rgba(255,255,255,0.3);
+}
+
+.log-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.log-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255,255,255,0.18);
+  gap: 10px;
+}
+
+.log-empty svg {
+  opacity: 0.25;
+}
+
+.log-empty p {
+  font-size: 13px;
+  text-align: center;
+}
+
+.log-entry {
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.07);
+  overflow: hidden;
+  animation: fadeSlideIn 0.35s ease both;
+}
+
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.log-entry-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(255,255,255,0.04);
+  cursor: pointer;
+  user-select: none;
+}
+
+.log-method {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.log-method.POST { background: rgba(251, 146, 60, 0.2); color: #fb923c; }
+.log-method.GET  { background: rgba(96, 165, 250, 0.2); color: #60a5fa; }
+.log-method.REDIRECT { background: rgba(167, 139, 250, 0.2); color: #a78bfa; }
+
+.log-url {
+  flex: 1;
+  font-size: 12px;
+  color: rgba(255,255,255,0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: ui-monospace, Consolas, monospace;
+}
+
+.log-status {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.log-status.ok    { background: rgba(34,197,94,0.15); color: #4ade80; }
+.log-status.error { background: rgba(239,68,68,0.15); color: #f87171; }
+.log-status.info  { background: rgba(148,163,184,0.12); color: #94a3b8; }
+
+.log-time {
+  font-size: 11px;
+  color: rgba(255,255,255,0.25);
+  font-family: ui-monospace, Consolas, monospace;
+}
+
+.log-entry-body {
+  padding: 12px 14px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.log-section-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: rgba(255,255,255,0.3);
+  margin-bottom: 4px;
+}
+
+.log-code {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+  color: rgba(255,255,255,0.75);
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.6;
+  background: rgba(0,0,0,0.25);
+  padding: 10px 12px;
+  border-radius: 7px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.log-timer {
+  height: 2px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 1px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.log-timer-bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 1px;
+  animation: timerShrink 4s linear forwards;
+}
+
+@keyframes timerShrink {
+  from { width: 100%; }
+  to   { width: 0%; }
+}
+
+/* ============================================================
+   FIELD TABLE (Request / Response key-value rows)
+   ============================================================ */
+.field-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-table {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* Left panel field table re-uses same class but with light theme */
+.flow-actions .field-table {
+  border-color: var(--border);
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.flow-actions .field-row {
+  border-bottom-color: var(--border);
+}
+
+.field-row:last-child {
+  border-bottom: none;
+}
+
+.field-key {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  color: #94a3b8;
+  padding: 7px 10px;
+  background: rgba(255,255,255,0.02);
+  border-right: 1px solid rgba(255,255,255,0.06);
+  word-break: break-word;
+  line-height: 1.5;
+}
+
+.flow-actions .field-key {
+  background: var(--code-bg);
+  color: var(--text);
+  border-right-color: var(--border);
+}
+
+.field-value-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
+.field-value {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  color: rgba(255,255,255,0.75);
+  padding: 7px 10px;
+  word-break: break-all;
+  line-height: 1.5;
+}
+
+.flow-actions .field-value {
+  color: var(--text-h);
+}
+
+.field-value.truncated {
+  color: rgba(255,255,255,0.45);
+}
+
+/* ─── JWT inline decoder ─────────────────────────────────── */
+.field-jwt {
+  width: 100%;
+}
+
+.field-jwt-pill {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.field-jwt-pill:hover {
+  background: rgba(167,139,250,0.08);
+}
+
+.jwt-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(167,139,250,0.2);
+  color: #a78bfa;
+  flex-shrink: 0;
+}
+
+.expand-arrow {
+  font-size: 10px;
+  color: rgba(255,255,255,0.3);
+  margin-left: auto;
+}
+
+.field-jwt-decoded {
+  border-top: 1px solid rgba(167,139,250,0.15);
+  background: rgba(167,139,250,0.04);
+}
+
+.jwt-claim-row {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  padding: 5px 10px 5px 14px;
+  gap: 8px;
+}
+
+.jwt-claim-row:last-child {
+  border-bottom: none;
+}
+
+.jwt-claim-key {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  color: #a78bfa;
+  word-break: break-word;
+}
+
+.jwt-claim-value {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  color: rgba(255,255,255,0.65);
+  word-break: break-all;
+}
+
+.log-chevron {
+  font-size: 14px;
+  color: rgba(255,255,255,0.25);
+  flex-shrink: 0;
+}
+
+.log-body::-webkit-scrollbar,
+.log-code::-webkit-scrollbar,
+.flow-steps::-webkit-scrollbar {
+  width: 4px;
+}
+.log-body::-webkit-scrollbar-track,
+.log-code::-webkit-scrollbar-track,
+.flow-steps::-webkit-scrollbar-track {
+  background: transparent;
+}
+.log-body::-webkit-scrollbar-thumb,
+.log-code::-webkit-scrollbar-thumb,
+.flow-steps::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.12);
+  border-radius: 2px;
+}

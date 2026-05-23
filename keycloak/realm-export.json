@@ -37,7 +37,9 @@
             "webOrigins": [
                 "http://localhost:3000"
             ],
-            "description": "The React Single Page Application"
+            "description": "The React Single Page Application",
+            "defaultClientScopes": [],
+            "optionalClientScopes": []
         }
     ],
     "roles": {
