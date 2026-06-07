@@ -1,0 +1,178 @@
+{
+    "id": "unihub",
+    "realm": "unihub",
+    "enabled": true,
+    "smtpServer": {
+        "host": "smtp.gmail.com",
+        "port": "587",
+        "starttls": "true",
+        "auth": "true",
+        "ssl": "false",
+        "from": "[EMAIL_ADDRESS]",
+        "fromDisplayName": "Unihub Workshop",
+        "replyTo": "[EMAIL_ADDRESS]",
+        "user": "[EMAIL_ADDRESS]",
+        "password": "[APPLICATION_PASSWORD]"
+    },
+    "displayName": "Unihub Workshop",
+    "clients": [
+        {
+            "clientId": "backend-api",
+            "enabled": true,
+            "protocol": "openid-connect",
+            "bearerOnly": true,
+            "publicClient": false,
+            "secret": "super-secret-key",
+            "description": "The Backend API that secures the workshop data"
+        },
+        {
+            "clientId": "frontend-app",
+            "enabled": true,
+            "protocol": "openid-connect",
+            "publicClient": true,
+            "standardFlowEnabled": true,
+            "directAccessGrantsEnabled": true,
+            "redirectUris": [
+                "http://localhost:3000/*"
+            ],
+            "webOrigins": [
+                "http://localhost:3000"
+            ],
+            "description": "The React Single Page Application",
+            "defaultClientScopes": [],
+            "optionalClientScopes": []
+        }
+    ],
+    "roles": {
+        "realm": [
+            {
+                "name": "realm-admin",
+                "description": "Administrator role for the realm",
+                "composite": true,
+                "clientRole": false,
+                "composites": {
+                    "client": {
+                        "account": [
+                            "manage-account",
+                            "view-profile"
+                        ],
+                        "realm-management": [
+                            "realm-admin"
+                        ]
+                    }
+                }
+            }
+        ],
+        "client": {
+            "backend-api": [
+                {
+                    "name": "read-workshop",
+                    "description": "Can view workshop details"
+                },
+                {
+                    "name": "create-workshop",
+                    "description": "Can create new workshops"
+                },
+                {
+                    "name": "update-workshop",
+                    "description": "Can edit existing workshops"
+                },
+                {
+                    "name": "delete-workshop",
+                    "description": "Can delete workshops"
+                },
+                {
+                    "name": "checkin-workshop",
+                    "description": "Can mark attendees as present"
+                },
+                {
+                    "name": "register-workshop",
+                    "description": "Can register themselves for a workshop"
+                },
+                {
+                    "name": "create-staff",
+                    "description": "Can create new staff"
+                },
+                {
+                    "name": "update-staff",
+                    "description": "Can edit existing staff"
+                },
+                {
+                    "name": "read-staff",
+                    "description": "Can view staff details"
+                },
+                {
+                    "name": "delete-staff",
+                    "description": "Can delete staffs"
+                }
+            ]
+        }
+    },
+    "groups": [
+        {
+            "name": "admins",
+            "path": "/admins",
+            "clientRoles": {
+                "backend-api": [
+                    "read-workshop",
+                    "create-workshop",
+                    "update-workshop",
+                    "delete-workshop",
+                    "read-staff",
+                    "create-staff",
+                    "update-staff",
+                    "delete-staff"
+                ]
+            }
+        },
+        {
+            "name": "staffs",
+            "path": "/staffs",
+            "clientRoles": {
+                "backend-api": [
+                    "read-workshop",
+                    "checkin-workshop"
+                ]
+            }
+        },
+        {
+            "name": "clients",
+            "path": "/clients",
+            "clientRoles": {
+                "backend-api": [
+                    "read-workshop",
+                    "register-workshop"
+                ]
+            }
+        }
+    ],
+    "users": [
+        {
+            "username": "admin",
+            "email": "admin@unihub.local",
+            "enabled": true,
+            "emailVerified": true,
+            "firstName": "System",
+            "lastName": "Admin",
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "admin",
+                    "temporary": false
+                }
+            ],
+            "groups": [
+                "/admins"
+            ],
+            "realmRoles": [
+                "realm-admin"
+            ]
+        }
+    ],
+    "defaultGroups": [
+        "/clients"
+    ],
+    "registrationAllowed": true,
+    "verifyEmail": true,
+    "rememberMe": true
+}

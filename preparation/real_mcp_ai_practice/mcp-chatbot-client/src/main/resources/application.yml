@@ -1,0 +1,20 @@
+server:
+  port: 8081
+
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.mcp.client.autoconfigure.McpClientAutoConfiguration
+      - org.springframework.ai.mcp.client.autoconfigure.McpToolCallbackAutoConfiguration
+      - org.springframework.ai.mcp.client.autoconfigure.SseWebFluxTransportAutoConfiguration
+      - org.springframework.ai.mcp.client.autoconfigure.SseHttpClientTransportAutoConfiguration
+  application:
+    name: mcp-chatbot-client
+  ai:
+    openai:
+      base-url: https://models.inference.ai.azure.com
+      api-key: ${GITHUB_TOKEN}
+      chat:
+        completions-path: /chat/completions
+        options:
+          model: gpt-4o-mini

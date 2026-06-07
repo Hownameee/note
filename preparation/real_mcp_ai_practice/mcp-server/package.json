@@ -1,0 +1,10 @@
+{
+  "name": "mcp-server",
+  "version": "1.0.0",
+  "description": "MCP Banking Server running on STDIO",
+  "type": "module",
+  "main": "index.js",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.6.0"
+  }
+}

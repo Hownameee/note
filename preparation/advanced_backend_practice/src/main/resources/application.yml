@@ -1,0 +1,13 @@
+server:
+  port: 8081 # Đổi cổng để tránh đụng độ với Keycloak (thường chạy cổng 8080)
+
+spring:
+  application:
+    name: advanced-backend-practice
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Mình đã tự động sửa lại thành realm "unihub" để khớp hoàn toàn với file realm-export.json của bạn
+          issuer-uri: http://localhost:8080/realms/unihub
+          jwk-set-uri: http://localhost:8080/realms/unihub/protocol/openid-connect/certs

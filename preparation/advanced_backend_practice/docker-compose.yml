@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.2
+    # Lệnh start-dev khởi động Keycloak ở chế độ Development (nhanh, gọn nhẹ, phù hợp làm máy ảo test)
+    command: start-dev --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+    ports:
+      - "8080:8080"
+    volumes:
+      # Chúng ta map file realm-export.json cục bộ vào Keycloak để tự động cấu hình
+      - ./realm-export.json:/opt/keycloak/data/import/realm.json
