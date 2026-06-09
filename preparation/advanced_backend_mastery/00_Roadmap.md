@@ -34,6 +34,9 @@ Tài liệu này là lộ trình để tiến tới mức độ Senior Backend /
 1. **Inversion of Control (IoC) & Dependency Injection (DI):** ApplicationContext và Bean Lifecycle.
 2. **AOP (Aspect-Oriented Programming):** Proxy Pattern đằng sau `@Transactional` và bảo mật.
 3. **Spring Security Architecture:** `SecurityFilterChain`, bộ lọc request.
+4. **JPA & Hibernate Performance (N+1 Query):** Giải quyết tận gốc N+1 query bằng Join Fetch, EntityGraph, BatchSize và DTO Projection.
+5. **Spring `@Autowired` Deep Dive:** Cơ chế hoạt động của `AutowiredAnnotationBeanPostProcessor`, thuật toán phân giải Bean và tối ưu hóa Spring Boot 3.* với AOT/Native Image.
+6. **Sức mạnh `@Transactional(readOnly = true)`:** Tối ưu hóa Dirty Checking ở mức Hibernate, cấu hình JDBC Connection, và định tuyến sang Read Replicas.
 
 ---
 
