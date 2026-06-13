@@ -868,3 +868,179 @@ curl -L \
 ```
 
 **Response:** `204 No Content`.
+
+---
+
+## 7. Workflow Definitions
+
+> **Scope cần thiết:** `workflow` — dùng để quản lý workflow definitions (file YAML).
+> Đọc thông tin workflow chỉ cần `repo`. Trigger / disable / update file cần `workflow`.
+
+### GET /repos/{owner}/{repo}/actions/workflows — Danh sách tất cả workflows
+
+Trả về tất cả workflow files (`.github/workflows/*.yml`) trong repo.
+
+```bash
+curl -L \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  https://api.github.com/repos/Hownameee/note/actions/workflows
+```
+
+**Response fields (mỗi item trong `workflows` array):**
+
+| Field        | Type      | Mô tả                                                 |
+| :----------- | :-------- | :-------------------------------------------------    |
+| `id`         | `integer` | ID của workflow                                       |
+| `name`       | `string`  | Tên workflow (lấy từ field `name:` trong YAML)        |
+| `path`       | `string`  | Đường dẫn file (VD: `.github/workflows/ci.yml`)       |
+| `state`      | `string`  | `active` / `disabled_manually` / `disabled_inactivity`|
+| `created_at` | `string`  | Ngày tạo                                              |
+| `updated_at` | `string`  | Ngày cập nhật                                         |
+| `html_url`   | `string`  | URL trang workflow trên GitHub                        |
+| `badge_url`  | `string`  | URL badge status CI (dùng để embed vào README)        |
+
+---
+
+### GET /repos/{owner}/{repo}/actions/workflows/{workflow_id} — Chi tiết một workflow
+
+`{workflow_id}` có thể là **ID số** hoặc **tên file** (VD: `ci.yml`).
+
+```bash
+curl -L \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  https://api.github.com/repos/Hownameee/note/actions/workflows/ci.yml
+```
+
+---
+
+### GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs — Runs của một workflow cụ thể
+
+Filter workflow runs theo từng workflow file thay vì lấy toàn bộ.
+
+```bash
+curl -L \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  "https://api.github.com/repos/Hownameee/note/actions/workflows/ci.yml/runs?per_page=10"
+```
+
+Query parameters giống hệt `GET /actions/runs` (xem Section 6.3).
+
+---
+
+### POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches — Trigger workflow thủ công
+
+Trigger một workflow có event `workflow_dispatch`. Workflow YAML phải khai báo `on: workflow_dispatch`.
+
+**Scopes cần thiết:** `repo` là đủ (không cần `workflow`).
+
+```bash
+curl -L \
+  -X POST \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  https://api.github.com/repos/Hownameee/note/actions/workflows/ci.yml/dispatches \
+  -d '{
+    "ref": "main",
+    "inputs": {
+      "environment": "staging",
+      "debug": "true"
+    }
+  }'
+```
+
+**Request body:**
+
+| Field    | Type     | Bắt buộc | Mô tả                                                      |
+| :------- | :------- | :------: | :-----------------------------------------------------     |
+| `ref`    | `string` |    ✅    | Branch, tag, hoặc SHA để chạy workflow trên đó             |
+| `inputs` | `object` |    —     | Input parameters khai báo trong `workflow_dispatch.inputs` |
+
+**Response:** `204 No Content` nếu trigger thành công.
+
+---
+
+### PUT /repos/{owner}/{repo}/actions/workflows/{workflow_id}/enable — Bật workflow
+
+Bật lại workflow đang bị disable.
+
+**Scopes cần thiết:** `workflow`
+
+```bash
+curl -L \
+  -X PUT \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  https://api.github.com/repos/Hownameee/note/actions/workflows/ci.yml/enable
+```
+
+**Response:** `204 No Content`.
+
+---
+
+### PUT /repos/{owner}/{repo}/actions/workflows/{workflow_id}/disable — Tắt workflow
+
+Disable một workflow — không xóa file, chỉ ngừng trigger.
+
+**Scopes cần thiết:** `workflow`
+
+```bash
+curl -L \
+  -X PUT \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  https://api.github.com/repos/Hownameee/note/actions/workflows/ci.yml/disable
+```
+
+**Response:** `204 No Content`.
+
+---
+
+### PUT /repos/{owner}/{repo}/contents/{path} — Tạo / Update file workflow YAML
+
+Đây là Contents API dùng để tạo mới hoặc update nội dung file bất kỳ trong repo, bao gồm cả workflow files. **Đây là lý do chính cần `workflow` scope** — nếu path là `.github/workflows/*.yml`, GitHub yêu cầu scope này.
+
+**Scopes cần thiết:** `workflow` (khi path là workflow file), `repo` (cho file thông thường)
+
+```bash
+# Bước 1: Lấy SHA của file hiện tại (nếu update file đã tồn tại)
+curl -L \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  https://api.github.com/repos/Hownameee/note/contents/.github/workflows/ci.yml
+```
+
+```bash
+# Bước 2: Update file (content phải encode base64)
+curl -L \
+  -X PUT \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  https://api.github.com/repos/Hownameee/note/contents/.github/workflows/ci.yml \
+  -d '{
+    "message": "ci: update workflow",
+    "content": "<base64-encoded-content>",
+    "sha": "<sha-from-step-1>"
+  }'
+```
+
+**Request body:**
+
+| Field     | Type     | Bắt buộc    | Mô tả                                                        |
+| :-------- | :------- | :---------: | :----------------------------------------------------------- |
+| `message` | `string` |      ✅     | Commit message                                               |
+| `content` | `string` |      ✅     | Nội dung file **encode base64**                              |
+| `sha`     | `string` | Khi update  | SHA của file hiện tại (lấy từ `GET /contents/{path}`)        |
+| `branch`  | `string` |      —      | Branch để commit vào (mặc định: default branch)              |
+
+> Encode nội dung YAML sang base64: `base64 -w 0 ci.yml`
