@@ -1,0 +1,40 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: auth-github-jwt-demo-backend
+  security:
+    oauth2:
+      client:
+        registration:
+          github:
+            client-id: ${GITHUB_CLIENT_ID:}
+            client-secret: ${GITHUB_CLIENT_SECRET:}
+            scope:
+              - read:user
+              - user:email
+            redirect-uri: "{baseUrl}/auth/github/callback"
+  datasource:
+    url: jdbc:h2:mem:auth_demo;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+    show-sql: true
+
+app:
+  frontend-auth-callback-url: ${FRONTEND_AUTH_CALLBACK_URL:http://localhost:9090/?login=success}
+  jwt:
+    secret: ${JWT_SECRET:dev-only-secret-key-that-is-long-enough-for-hs256-demo}
+    expiration-minutes: ${JWT_EXPIRATION_MINUTES:60}
