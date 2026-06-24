@@ -204,6 +204,134 @@ Version 1 UUIDs are time-ordered (using IP address instead of MAC address), whic
 
 ---
 
+## Sequence Design Strategy: Global vs Per-Table
+
+When using `GenerationType.SEQUENCE`, you face an important architectural decision: should all entities share **one global sequence**, or should each table have **its own dedicated sequence**? The answer also differs subtly depending on whether you target **Oracle** or **PostgreSQL**.
+
+### Under-the-Hood Differences: Oracle vs PostgreSQL
+
+Both databases treat a `SEQUENCE` as a first-class database object. However, their syntax and caching model differ:
+
+| Aspect | PostgreSQL | Oracle |
+| :--- | :--- | :--- |
+| **Get next value** | `SELECT nextval('seq_name')` | `SELECT seq_name.NEXTVAL FROM DUAL` |
+| **Session cache** | Each session has its own cache — values can appear out-of-order across sessions | Shared pool cache — consistent across all sessions |
+| **Auto-increment alternative** | `SERIAL` / `BIGSERIAL` (backed by sequence) | `GENERATED AS IDENTITY` (Oracle 12c+, also backed by sequence internally) |
+| **Hibernate Dialect** | `PostgreSQLDialect` auto-generates `nextval(...)` | `OracleDialect` auto-generates `.NEXTVAL` |
+
+Hibernate's `Dialect` layer abstracts both syntaxes — you write `@SequenceGenerator` once and Hibernate generates the correct SQL for each database.
+
+---
+
+### Strategy 1: Global Sequence (One sequence shared across the entire DB)
+
+When you use `GenerationType.AUTO` without specifying a custom `@SequenceGenerator`, Hibernate defaults to a single shared sequence — `hibernate_sequence` (Hibernate 5) or `seq_gen_sequence` (Hibernate 6) — used by **every entity** in the application.
+
+```java
+// No explicit generator — Hibernate picks a shared sequence
+@Id
+@GeneratedValue(strategy = GenerationType.AUTO)
+private Long id;
+```
+
+**What actually happens in the DB:**
+
+```sql
+-- Hibernate calls one shared sequence for ALL tables:
+SELECT nextval('hibernate_sequence');  -- User gets id=1
+SELECT nextval('hibernate_sequence');  -- Order gets id=2
+SELECT nextval('hibernate_sequence');  -- User gets id=3
+SELECT nextval('hibernate_sequence');  -- Product gets id=4
+```
+
+**Trade-offs:**
+
+| | |
+| :--- | :--- |
+| ✅ **Zero setup** | No `@SequenceGenerator` annotation needed on any entity |
+| ✅ **Globally unique IDs** | No two rows across *any* table share the same ID — useful in some audit/event systems |
+| ❌ **Confusing ID gaps per table** | User IDs: 1, 3, 7, ... Order IDs: 2, 4, 6, ... IDs look non-sequential within a table, making debugging and statistics harder |
+| ❌ **Bottleneck at high concurrency** | All insert threads from all entity types contend for the same single sequence object |
+| ❌ **Hard to reset** | If you truncate a table, you can't reset just that table's counter without affecting every other entity |
+
+---
+
+### Strategy 2: Per-Table Sequence (One dedicated sequence per table) — Recommended
+
+Each entity declares its own `@SequenceGenerator` pointing to a **dedicated sequence object** in the DB. This is the standard pattern in enterprise applications.
+
+```java
+// User entity — uses its own sequence
+@Entity
+public class User {
+    @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "user_seq")
+    @SequenceGenerator(
+        name           = "user_seq",
+        sequenceName   = "users_id_seq",   // dedicated sequence for this table
+        allocationSize = 50
+    )
+    private Long id;
+}
+
+// Order entity — uses its own separate sequence
+@Entity
+public class Order {
+    @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "order_seq")
+    @SequenceGenerator(
+        name           = "order_seq",
+        sequenceName   = "orders_id_seq",  // dedicated sequence for this table
+        allocationSize = 50
+    )
+    private Long id;
+}
+```
+
+**What actually happens in the DB:**
+
+```sql
+-- Each table has its own independent counter:
+SELECT nextval('users_id_seq');    -- User gets id=1
+SELECT nextval('orders_id_seq');   -- Order gets id=1 (independent!)
+SELECT nextval('users_id_seq');    -- User gets id=2
+SELECT nextval('orders_id_seq');   -- Order gets id=2
+```
+
+**Trade-offs:**
+
+| | |
+| :--- | :--- |
+| ✅ **Clean, sequential IDs per table** | Users: 1, 2, 3, 4 ... Orders: 1, 2, 3, 4 ... Easy to reason about |
+| ✅ **Independent reset** | `TRUNCATE users; ALTER SEQUENCE users_id_seq RESTART;` — doesn't affect any other table |
+| ✅ **Better concurrency isolation** | High-volume insert on `orders` doesn't contend with inserts on `users` |
+| ❌ **More boilerplate** | Every entity needs its own `@SequenceGenerator` annotation |
+
+---
+
+### Aligning `allocationSize` with the DB Sequence Cache
+
+This is a critical subtlety that many developers miss. Hibernate's `allocationSize` (app-level cache) and the DB sequence's `INCREMENT BY` / `CACHE` (DB-level cache) must be **synchronized**, or you will get ID conflicts or large gaps.
+
+```sql
+-- PostgreSQL: create the sequence to match Hibernate's allocationSize=50
+CREATE SEQUENCE users_id_seq
+    START WITH 1
+    INCREMENT BY 50     -- must match allocationSize in @SequenceGenerator
+    CACHE 50;           -- optional DB-level cache for extra performance
+
+-- Oracle equivalent:
+CREATE SEQUENCE users_id_seq
+    START WITH 1
+    INCREMENT BY 50
+    CACHE 50
+    NOCYCLE;
+```
+
+> **Why this matters:** If Hibernate's `allocationSize=50` but the DB sequence `INCREMENT BY 1`, Hibernate thinks IDs 1–50 are reserved after fetching `nextval()=1`, but the DB only increments by 1. The next `nextval()` call returns 2, not 51 — causing **duplicate ID conflicts** and `DataIntegrityViolationException` errors under concurrent load.
+
+---
+
 ## IDENTITY vs SEQUENCE — Head-to-Head
 
 | Factor | `IDENTITY` | `SEQUENCE` |
@@ -269,3 +397,5 @@ private Long id;
 - [Hibernate 6.5 — Using table identifier generator](https://docs.hibernate.org/orm/6.5/userguide/html_single/#identifiers-generators-table)
 - [Hibernate 6.5 — Using AUTO](https://docs.hibernate.org/orm/6.5/userguide/html_single/#identifiers-generators-auto)
 - [PostgreSQL — CREATE SEQUENCE](https://www.postgresql.org/docs/17/sql-createsequence.html)
+- [Oracle — CREATE SEQUENCE](https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/CREATE-SEQUENCE.html)
+- [Vlad Mihalcea — Hibernate IDENTITY, SEQUENCE, and TABLE generators](https://vladmihalcea.com/hibernate-identity-sequence-and-table-sequence-generator/)
