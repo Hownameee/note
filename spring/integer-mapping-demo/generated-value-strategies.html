@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>@GeneratedValue in JPA — Deep Dive</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    max-width: 800px;
+    margin: 40px auto;
+    padding: 0 20px;
+  }
+  h1, h2, h3 {
+    color: #111;
+    margin-top: 24px;
+    margin-bottom: 16px;
+    font-weight: 600;
+  }
+  h1 { border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
+  h2 { border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 20px 0;
+  }
+  th, td {
+    border: 1px solid #dfe2e5;
+    padding: 8px 12px;
+    text-align: left;
+  }
+  th {
+    background-color: #f6f8fa;
+  }
+  pre {
+    background-color: #f6f8fa;
+    padding: 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 85%;
+  }
+  code {
+    background-color: rgba(27,31,35,0.05);
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 85%;
+  }
+  pre code {
+    background-color: transparent;
+    padding: 0;
+  }
+  blockquote {
+    border-left: 0.25em solid #dfe2e5;
+    color: #6a737d;
+    padding: 0.5em 1em;
+    margin: 20px 0;
+    background-color: #fafbfc;
+  }
+</style>
+</head>
+<body>
+
+<h1>@GeneratedValue in JPA — Deep Dive</h1>
+
+<h2>What it does</h2>
+<p><code>@GeneratedValue</code> tells Hibernate: <strong>"I don't want to manage the ID myself — you handle it."</strong> It always pairs with <code>@Id</code>. Without it, you'd need to set the ID manually before every <code>save()</code>.</p>
+
+<hr>
+
+<h2>The 5 Strategies</h2>
+
+<h3>1. <code>GenerationType.IDENTITY</code></h3>
+<pre><code>@Id
+@GeneratedValue(strategy = GenerationType.IDENTITY)
+private Long id;</code></pre>
+
+<p><strong>How it works internally:</strong></p>
+<p>Hibernate uses <code>org.hibernate.id.IdentityGenerator</code> under the hood. It tries 3 approaches to retrieve the DB-generated value, in order:</p>
+<ol>
+  <li><strong><code>Statement#getGeneratedKeys()</code></strong> — if the JDBC driver supports it (most modern drivers do).</li>
+  <li><strong><code>INSERT + SELECT</code> syntax</strong> — if <code>Dialect#supportsInsertSelectIdentity()</code> is true, Hibernate uses a dialect-specific combined statement.</li>
+  <li><strong>Separate identity query</strong> — as a last resort, Hibernate issues a separate SQL command defined by <code>Dialect#getIdentitySelectString</code>.</li>
+</ol>
+
+<pre><code>-- Hibernate sends:
+INSERT INTO employee (name, qualification) VALUES ('Alice', 'Engineer');
+-- DB assigns id = 42 automatically
+-- Hibernate retrieves id = 42 via getGeneratedKeys()</code></pre>
+
+<p>Supported by: MySQL, PostgreSQL, SQL Server.</p>
+
+<blockquote>
+  <strong>⚠️ Extended Persistence Context Warning (from Hibernate docs):</strong><br>
+  Because the entity row must be <strong>physically inserted before the ID is known</strong>, IDENTITY generation is problematic with <strong>extended persistence contexts</strong> (long-lived transactions / conversations). Hibernate officially recommends using <strong>SEQUENCE</strong> instead in those scenarios.
+</blockquote>
+
+<blockquote>
+  <strong>⚠️ Batch INSERT is disabled:</strong><br>
+  Hibernate cannot batch <code>INSERT</code> statements for entities using <code>IDENTITY</code> generation, because it needs each individual ID immediately after insertion. If the application frequently creates many entities of the same type at once, this can be a significant performance bottleneck.
+</blockquote>
+
+<p><strong>Delayed insert behavior (Hibernate 5.3+):</strong></p>
+<p>Hibernate 5.3 introduced delayed entity inserts when <code>flush-mode != AUTO</code>. This caused issues for entities with <code>IDENTITY</code> or <code>SEQUENCE</code> IDs involved in associations. Hibernate 5.4 added a smarter algorithm to decide if the insert should be delayed or not.</p>
+<p>If you hit edge cases, you can revert to the legacy behavior:</p>
+<pre><code>hibernate.id.disable_delayed_identity_inserts=true</code></pre>
+
+<hr>
+
+<h3>2. <code>GenerationType.SEQUENCE</code></h3>
+<pre><code>@Id
+@GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "emp_seq")
+@SequenceGenerator(name = "emp_seq", sequenceName = "employee_seq", allocationSize = 50)
+private Long id;</code></pre>
+
+<p><strong>How it works internally:</strong></p>
+<ol>
+  <li>Before inserting, Hibernate calls <code>SELECT nextval('employee_seq')</code> to get the next ID <em>from the DB sequence object</em>.</li>
+  <li>By default, it pre-fetches a <strong>block of IDs</strong> (controlled by <code>allocationSize</code>, default = 50) in one DB round-trip.</li>
+  <li>It assigns IDs from memory for the next 50 inserts, only calling the sequence again when the block is exhausted.</li>
+  <li>Because Hibernate already knows the ID before inserting, it <strong>can batch</strong> multiple <code>INSERT</code> statements together.</li>
+</ol>
+
+<pre><code>-- Hibernate pre-fetches a block:
+SELECT nextval('employee_seq');  -- returns 1 (representing IDs 1-50)
+
+-- Then batches all inserts together:
+INSERT INTO employee (id, name) VALUES (1, 'Alice');
+INSERT INTO employee (id, name) VALUES (2, 'Bob');
+INSERT INTO employee (id, name) VALUES (3, 'Carol');
+-- ... no extra DB round-trips needed until id 51</code></pre>
+
+<p>Supported by: PostgreSQL, Oracle, H2.</p>
+
+<hr>
+
+<h3>3. <code>GenerationType.TABLE</code></h3>
+<p>Hibernate uses <code>org.hibernate.id.enhanced.TableGenerator</code> under the hood. It maintains a table where each row is a named counter for a given entity type.</p>
+
+<p><strong>Minimal setup (unnamed):</strong></p>
+<pre><code>@Entity
+public class Product {
+    @Id
+    @GeneratedValue(strategy = GenerationType.TABLE)
+    private Long id;
+}</code></pre>
+
+<p>When no table name is given, Hibernate defaults to <code>hibernate_sequences</code>. When no <code>pkColumnValue</code> is specified, it uses the <code>"default"</code> segment.</p>
+
+<pre><code>create table hibernate_sequences (
+    sequence_name varchar(255) not null,
+    next_val      bigint,
+    primary key (sequence_name)
+);</code></pre>
+
+<p><strong>Configured setup with `@TableGenerator`:</strong></p>
+<pre><code>@Id
+@GeneratedValue(strategy = GenerationType.TABLE, generator = "table-generator")
+@TableGenerator(
+    name            = "table-generator",
+    table           = "table_identifier",
+    pkColumnName    = "table_name",
+    valueColumnName = "product_id",
+    allocationSize  = 5
+)
+private Long id;</code></pre>
+
+<p><strong>What actually runs in the DB for 3 inserts</strong> (shows the locking overhead):</p>
+<pre><code>-- 1. Lock the counter row and read current value
+SELECT tbl.product_id FROM table_identifier tbl
+WHERE  tbl.table_name = 'Product' FOR UPDATE;
+
+-- 2. Update counter by allocationSize (5)
+UPDATE table_identifier
+SET    product_id = 6
+WHERE  product_id = 1 AND table_name = 'Product';
+
+-- ... (repeats SELECT FOR UPDATE + UPDATE when block is exhausted)
+
+-- 3. Finally insert the entities
+INSERT INTO Product (product_name, id) VALUES ('Product 1', 1);
+INSERT INTO Product (product_name, id) VALUES ('Product 2', 2);
+INSERT INTO Product (product_name, id) VALUES ('Product 3', 3);</code></pre>
+
+<p><strong>Slowest of all strategies</strong> — the <code>SELECT FOR UPDATE</code> on the counter table creates a lock contention bottleneck under concurrent load. Works across all databases, but <strong>avoid in production</strong>.</p>
+
+<hr>
+
+<h3>4. <code>GenerationType.AUTO</code> (Default)</h3>
+<pre><code>@Id
+@GeneratedValue(strategy = GenerationType.AUTO)
+private Long id;</code></pre>
+
+<p>Hibernate picks a strategy based on the DB dialect. For PostgreSQL with Hibernate 6+, it defaults to <strong>SEQUENCE</strong> (using a shared <code>hibernate_sequence</code>).</p>
+<p>Behavior can vary across DB and Hibernate versions — avoid in serious projects; be explicit about your strategy.</p>
+
+<hr>
+
+<h3>5. <code>GenerationType.UUID</code></h3>
+<p>Hibernate uses <code>org.hibernate.id.UUIDGenerator</code> internally. It supports pluggable UUID generation strategies via the <code>org.hibernate.id.UUIDGenerationStrategy</code> contract.</p>
+
+<p><strong>Default: RFC 4122 Version 4 (random)</strong></p>
+<pre><code>@Entity
+public class Book {
+    @Id
+    @GeneratedValue  // UUID type on field implies UUID generation
+    private UUID id; // field type is java.util.UUID
+
+    private String title;
+}</code></pre>
+
+<p>The ID is generated <strong>entirely in Java memory</strong> before the <code>INSERT</code> — no DB round-trip needed, enabling batching.</p>
+
+<p><strong>Alternative: RFC 4122 Version 1 (time-based)</strong> via <code>@GenericGenerator</code>:</p>
+<pre><code>@Id
+@GeneratedValue(generator = "custom-uuid")
+@GenericGenerator(
+    name     = "custom-uuid",
+    strategy = "org.hibernate.id.UUIDGenerator",
+    parameters = {
+        @Parameter(
+            name  = "uuid_gen_strategy_class",
+            value = "org.hibernate.id.uuid.CustomVersionOneStrategy"
+        )
+    }
+)
+private UUID id;</code></pre>
+
+<p>Version 1 UUIDs are time-ordered (using IP address instead of MAC address), which can be more index-friendly in databases.</p>
+
+<blockquote>
+  Requires: Jakarta Persistence 3.1+ / Hibernate 6+. Not available in JPA 2.x.<br>
+  The field type can be <code>java.util.UUID</code> (stored as <code>UUID</code> natively in PostgreSQL) or <code>String</code> (stored as <code>VARCHAR(36)</code>).
+</blockquote>
+
+<hr>
+
+<h2>IDENTITY vs SEQUENCE — Head-to-Head</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Factor</th>
+      <th><code>IDENTITY</code></th>
+      <th><code>SEQUENCE</code></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>ID generated by</strong></td>
+      <td>Database (after INSERT)</td>
+      <td>Database sequence (before INSERT)</td>
+    </tr>
+    <tr>
+      <td><strong>Hibernate knows ID before INSERT?</strong></td>
+      <td>❌ No</td>
+      <td>✅ Yes</td>
+    </tr>
+    <tr>
+      <td><strong>JDBC Batch Insert support</strong></td>
+      <td>❌ Disabled</td>
+      <td>✅ Enabled</td>
+    </tr>
+    <tr>
+      <td><strong>DB round-trips per insert</strong></td>
+      <td>1 INSERT + 1 <code>getGeneratedKeys()</code></td>
+      <td>~1 per 50 inserts (with <code>allocationSize=50</code>)</td>
+    </tr>
+    <tr>
+      <td><strong>ID gaps possible?</strong></td>
+      <td>No (sequential per table)</td>
+      <td>Yes (gaps at app restart or rollback)</td>
+    </tr>
+    <tr>
+      <td><strong>DB support</strong></td>
+      <td>MySQL, PostgreSQL, SQL Server</td>
+      <td>PostgreSQL, Oracle, H2</td>
+    </tr>
+    <tr>
+      <td><strong>Config complexity</strong></td>
+      <td>✅ Zero (simplest)</td>
+      <td>Slightly more (<code>@SequenceGenerator</code> needed)</td>
+    </tr>
+    <tr>
+      <td><strong>Performance at high write volume</strong></td>
+      <td>❌ Slower</td>
+      <td>✅ Significantly faster</td>
+    </tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>Which is Best for Sequential <code>1 → N</code> Primary Keys?</h2>
+
+<h3>✅ Use <code>IDENTITY</code> when</h3>
+<ul>
+  <li>Write volume is <strong>low to moderate</strong> (typical CRUD web app).</li>
+  <li>You want <strong>zero configuration</strong> and <strong>strictly sequential IDs with no gaps</strong>.</li>
+  <li>You're using <strong>MySQL</strong> (which has no native sequence object).</li>
+  <li>Simplicity is a priority.</li>
+</ul>
+
+<h3>✅ Use <code>SEQUENCE</code> when</h3>
+<ul>
+  <li>You have <strong>high write throughput</strong> (bulk inserts, batch jobs, event logs).</li>
+  <li>You want <strong>JDBC batch insert optimization</strong> — can give <strong>5-10x throughput improvement</strong> for bulk writes.</li>
+  <li>You're on <strong>PostgreSQL or Oracle</strong> (sequence objects are first-class citizens).</li>
+  <li>You can tolerate <strong>ID gaps</strong> (e.g., IDs jump from 50 → 101 after restart — the gap comes from the pre-allocated block being discarded).</li>
+</ul>
+
+<hr>
+
+<h2>Practical Recommendation</h2>
+
+<pre><code>// For most Spring Boot + PostgreSQL apps:
+// Simple entities with low-moderate write → IDENTITY is fine
+@Id
+@GeneratedValue(strategy = GenerationType.IDENTITY)
+private Long id;
+
+// For high-throughput entities (orders, events, audit logs):
+@Id
+@GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "order_seq")
+@SequenceGenerator(
+    name         = "order_seq",
+    sequenceName = "order_id_seq",
+    allocationSize = 50   // pre-fetch 50 IDs at once
+)
+private Long id;</code></pre>
+
+<blockquote>
+  <strong>Rule of thumb:</strong> Start with <code>IDENTITY</code> for simplicity. Switch to <code>SEQUENCE</code> only when you observe write bottlenecks or need batch insert performance — it's an easy migration since it only changes the ID generation mechanism, not the column type (<code>BIGINT</code> stays <code>BIGINT</code>).
+</blockquote>
+
+<hr>
+
+<h2>References</h2>
+<ul>
+  <li><a href="https://jakarta.ee/specifications/persistence/3.1/apidocs/jakarta.persistence/jakarta/persistence/generatedvalue">Jakarta Persistence — @GeneratedValue</a></li>
+  <li><a href="https://docs.hibernate.org/orm/6.5/userguide/html_single/#identifiers-generators-identity">Hibernate 6.5 — Using IDENTITY columns</a></li>
+  <li><a href="https://docs.hibernate.org/orm/6.5/userguide/html_single/#identifiers-generators-sequence">Hibernate 6.5 — Using sequences</a></li>
+  <li><a href="https://docs.hibernate.org/orm/6.5/userguide/html_single/#identifiers-generators-table">Hibernate 6.5 — Using table identifier generator</a></li>
+  <li><a href="https://docs.hibernate.org/orm/6.5/userguide/html_single/#identifiers-generators-auto">Hibernate 6.5 — Using AUTO</a></li>
+  <li><a href="https://www.postgresql.org/docs/17/sql-createsequence.html">PostgreSQL — CREATE SEQUENCE</a></li>
+</ul>
+
+</body>
+</html>
