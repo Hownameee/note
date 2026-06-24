@@ -70,7 +70,7 @@
 
 <hr>
 
-<h2>The 5 Strategies</h2>
+<h2>The 2 Primary Strategies</h2>
 
 <h3>1. <code>GenerationType.IDENTITY</code></h3>
 <pre><code>@Id
@@ -81,7 +81,7 @@ private Long id;</code></pre>
 <p>Hibernate uses <code>org.hibernate.id.IdentityGenerator</code> under the hood. It tries 3 approaches to retrieve the DB-generated value, in order:</p>
 <ol>
   <li><strong><code>Statement#getGeneratedKeys()</code></strong> — if the JDBC driver supports it (most modern drivers do).</li>
-  <li><strong><code>INSERT + SELECT` syntax</code></strong> — if <code>Dialect#supportsInsertSelectIdentity()</code> is true, Hibernate uses a dialect-specific combined statement.</li>
+  <li><strong><code>INSERT + SELECT</code> syntax</strong> — if <code>Dialect#supportsInsertSelectIdentity()</code> is true, Hibernate uses a dialect-specific combined statement.</li>
   <li><strong>Separate identity query</strong> — as a last resort, Hibernate issues a separate SQL command defined by <code>Dialect#getIdentitySelectString</code>.</li>
 </ol>
 
@@ -133,107 +133,6 @@ INSERT INTO employee (id, name) VALUES (3, 'Carol');
 -- ... no extra DB round-trips needed until id 51</code></pre>
 
 <p>Supported by: PostgreSQL, Oracle, H2.</p>
-
-<hr>
-
-<h3>3. <code>GenerationType.TABLE</code></h3>
-<p>Hibernate uses <code>org.hibernate.id.enhanced.TableGenerator</code> under the hood. It maintains a table where each row is a named counter for a given entity type.</p>
-
-<p><strong>Minimal setup (unnamed):</strong></p>
-<pre><code>@Entity
-public class Product {
-    @Id
-    @GeneratedValue(strategy = GenerationType.TABLE)
-    private Long id;
-}</code></pre>
-
-<p>When no table name is given, Hibernate defaults to <code>hibernate_sequences</code>. When no <code>pkColumnValue</code> is specified, it uses the <code>"default"</code> segment.</p>
-
-<pre><code>create table hibernate_sequences (
-    sequence_name varchar(255) not null,
-    next_val      bigint,
-    primary key (sequence_name)
-);</code></pre>
-
-<p><strong>Configured setup with `@TableGenerator`:</strong></p>
-<pre><code>@Id
-@GeneratedValue(strategy = GenerationType.TABLE, generator = "table-generator")
-@TableGenerator(
-    name            = "table-generator",
-    table           = "table_identifier",
-    pkColumnName    = "table_name",
-    valueColumnName = "product_id",
-    allocationSize  = 5
-)
-private Long id;</code></pre>
-
-<p><strong>What actually runs in the DB for 3 inserts</strong> (shows the locking overhead):</p>
-<pre><code>-- 1. Lock the counter row and read current value
-SELECT tbl.product_id FROM table_identifier tbl
-WHERE  tbl.table_name = 'Product' FOR UPDATE;
-
--- 2. Update counter by allocationSize (5)
-UPDATE table_identifier
-SET    product_id = 6
-WHERE  product_id = 1 AND table_name = 'Product';
-
--- ... (repeats SELECT FOR UPDATE + UPDATE when block is exhausted)
-
--- 3. Finally insert the entities
-INSERT INTO Product (product_name, id) VALUES ('Product 1', 1);
-INSERT INTO Product (product_name, id) VALUES ('Product 2', 2);
-INSERT INTO Product (product_name, id) VALUES ('Product 3', 3);</code></pre>
-
-<p><strong>Slowest of all strategies</strong> — the <code>SELECT FOR UPDATE</code> on the counter table creates a lock contention bottleneck under concurrent load. Works across all databases, but <strong>avoid in production</strong>.</p>
-
-<hr>
-
-<h3>4. <code>GenerationType.AUTO</code> (Default)</h3>
-<pre><code>@Id
-@GeneratedValue(strategy = GenerationType.AUTO)
-private Long id;</code></pre>
-
-<p>Hibernate picks a strategy based on the DB dialect. For PostgreSQL with Hibernate 6+, it defaults to <strong>SEQUENCE</strong> (using a shared <code>hibernate_sequence</code>).</p>
-<p>Behavior can vary across DB and Hibernate versions — avoid in serious projects; be explicit about your strategy.</p>
-
-<hr>
-
-<h3>5. <code>GenerationType.UUID</code></h3>
-<p>Hibernate uses <code>org.hibernate.id.UUIDGenerator</code> internally. It supports pluggable UUID generation strategies via the <code>org.hibernate.id.UUIDGenerationStrategy</code> contract.</p>
-
-<p><strong>Default: RFC 4122 Version 4 (random)</strong></p>
-<pre><code>@Entity
-public class Book {
-    @Id
-    @GeneratedValue  // UUID type on field implies UUID generation
-    private UUID id; // field type is java.util.UUID
-
-    private String title;
-}</code></pre>
-
-<p>The ID is generated <strong>entirely in Java memory</strong> before the <code>INSERT</code> — no DB round-trip needed, enabling batching.</p>
-
-<p><strong>Alternative: RFC 4122 Version 1 (time-based)</strong> via <code>@GenericGenerator</code>:</p>
-<pre><code>@Id
-@GeneratedValue(generator = "custom-uuid")
-@GenericGenerator(
-    name     = "custom-uuid",
-    strategy = "org.hibernate.id.UUIDGenerator",
-    parameters = {
-        @Parameter(
-            name  = "uuid_gen_strategy_class",
-            value = "org.hibernate.id.uuid.CustomVersionOneStrategy"
-        )
-    }
-)
-private UUID id;</code></pre>
-
-<p>Version 1 UUIDs are time-ordered (using IP address instead of MAC address), which can be more index-friendly in databases.</p>
-
-<blockquote>
-  Requires: Jakarta Persistence 3.1+ / Hibernate 6+. Not available in JPA 2.x.<br>
-  The field type can be <code>java.util.UUID</code> (stored as <code>UUID</code> natively in PostgreSQL) or <code>String</code> (stored as <code>VARCHAR(36)</code>).
-</blockquote>
 
 <hr>
 
@@ -408,7 +307,7 @@ CREATE SEQUENCE users_id_seq
     NOCYCLE;</code></pre>
 
 <blockquote>
-  <strong>Why this matters:</strong> If Hibernate's <code>allocationSize=50</code> but the DB sequence <code>INCREMENT BY 1</code>, Hibernate thinks IDs 1–50 are reserved after fetching <code>nextval()=1</code>, but the DB only increments by 1. The next <code>nextval()</code> call returns 2, not 51 — causing <strong>duplicate ID conflicts</strong> and <code>DataIntegrityViolationException</code> errors under concurrent load.
+  <strong>Why this matters:</strong> If Hibernate's <code>allocationSize=50</code> but the DB sequence <code>INCREMENT BY 1</code>, Hibernate thinks IDs 1–50 are reserved after fetching <code>nextval()=1</code>, but the DB only increments by 1. The next <code>nextval()</code> call returns 2, not 51 — causing <strong>duplicate ID conflicts</strong> and <code>DataIntegrityViolationException` errors under concurrent load.
 </blockquote>
 
 <hr>
@@ -518,11 +417,9 @@ private Long id;</code></pre>
   <li><a href="https://jakarta.ee/specifications/persistence/3.1/apidocs/jakarta.persistence/jakarta/persistence/generatedvalue">Jakarta Persistence — @GeneratedValue</a></li>
   <li><a href="https://docs.hibernate.org/orm/6.5/userguide/html_single/#identifiers-generators-identity">Hibernate 6.5 — Using IDENTITY columns</a></li>
   <li><a href="https://docs.hibernate.org/orm/6.5/userguide/html_single/#identifiers-generators-sequence">Hibernate 6.5 — Using sequences</a></li>
-  <li><a href="https://docs.hibernate.org/orm/6.5/userguide/html_single/#identifiers-generators-table">Hibernate 6.5 — Using table identifier generator</a></li>
-  <li><a href="https://docs.hibernate.org/orm/6.5/userguide/html_single/#identifiers-generators-auto">Hibernate 6.5 — Using AUTO</a></li>
   <li><a href="https://www.postgresql.org/docs/17/sql-createsequence.html">PostgreSQL — CREATE SEQUENCE</a></li>
   <li><a href="https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/CREATE-SEQUENCE.html">Oracle — CREATE SEQUENCE</a></li>
-  <li><a href="https://vladmihalcea.com/hibernate-identity-sequence-and-table-sequence-generator/">Vlad Mihalcea — Hibernate IDENTITY, SEQUENCE, and TABLE generators</a></li>
+  <li><a href="https://vladmihalcea.com/hibernate-identity-sequence-and-table-sequence-generator/">Vlad Mihalcea — Hibernate IDENTITY and SEQUENCE generators</a></li>
 </ul>
 
 </body>

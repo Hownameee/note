@@ -7,7 +7,7 @@ It always pairs with `@Id`. Without it, you'd need to set the ID manually before
 
 ---
 
-## The 5 Strategies
+## The 2 Primary Strategies
 
 ### 1. `GenerationType.IDENTITY`
 
@@ -82,127 +82,6 @@ Supported by: PostgreSQL, Oracle, H2.
 
 ---
 
-### 3. `GenerationType.TABLE`
-
-Hibernate uses `org.hibernate.id.enhanced.TableGenerator` under the hood. It maintains a table where each row is a named counter for a given entity type.
-
-**Minimal setup (unnamed):**
-
-```java
-@Entity
-public class Product {
-    @Id
-    @GeneratedValue(strategy = GenerationType.TABLE)
-    private Long id;
-}
-```
-
-When no table name is given, Hibernate defaults to `hibernate_sequences`. When no `pkColumnValue` is specified, it uses the `"default"` segment.
-
-```sql
-create table hibernate_sequences (
-    sequence_name varchar(255) not null,
-    next_val      bigint,
-    primary key (sequence_name)
-);
-```
-
-**Configured setup with `@TableGenerator`:**
-
-```java
-@Id
-@GeneratedValue(strategy = GenerationType.TABLE, generator = "table-generator")
-@TableGenerator(
-    name            = "table-generator",
-    table           = "table_identifier",
-    pkColumnName    = "table_name",
-    valueColumnName = "product_id",
-    allocationSize  = 5
-)
-private Long id;
-```
-
-**What actually runs in the DB for 3 inserts** (shows the locking overhead):
-
-```sql
--- 1. Lock the counter row and read current value
-SELECT tbl.product_id FROM table_identifier tbl
-WHERE  tbl.table_name = 'Product' FOR UPDATE;
-
--- 2. Update counter by allocationSize (5)
-UPDATE table_identifier
-SET    product_id = 6
-WHERE  product_id = 1 AND table_name = 'Product';
-
--- ... (repeats SELECT FOR UPDATE + UPDATE when block is exhausted)
-
--- 3. Finally insert the entities
-INSERT INTO Product (product_name, id) VALUES ('Product 1', 1);
-INSERT INTO Product (product_name, id) VALUES ('Product 2', 2);
-INSERT INTO Product (product_name, id) VALUES ('Product 3', 3);
-```
-
-**Slowest of all strategies** — the `SELECT FOR UPDATE` on the counter table creates a lock contention bottleneck under concurrent load. Works across all databases, but **avoid in production**.
-
----
-
-### 4. `GenerationType.AUTO` (Default)
-
-```java
-@Id
-@GeneratedValue(strategy = GenerationType.AUTO)
-private Long id;
-```
-
-Hibernate picks a strategy based on the DB dialect. For PostgreSQL with Hibernate 6+, it defaults to **SEQUENCE** (using a shared `hibernate_sequence`).
-
-Behavior can vary across DB and Hibernate versions — avoid in serious projects; be explicit about your strategy.
-
----
-
-### 5. `GenerationType.UUID`
-
-Hibernate uses `org.hibernate.id.UUIDGenerator` internally. It supports pluggable UUID generation strategies via the `org.hibernate.id.UUIDGenerationStrategy` contract.
-
-**Default: RFC 4122 Version 4 (random)**
-
-```java
-@Entity
-public class Book {
-    @Id
-    @GeneratedValue  // UUID type on field implies UUID generation
-    private UUID id; // field type is java.util.UUID
-
-    private String title;
-}
-```
-
-The ID is generated **entirely in Java memory** before the `INSERT` — no DB round-trip needed, enabling batching.
-
-**Alternative: RFC 4122 Version 1 (time-based)** via `@GenericGenerator`:
-
-```java
-@Id
-@GeneratedValue(generator = "custom-uuid")
-@GenericGenerator(
-    name     = "custom-uuid",
-    strategy = "org.hibernate.id.UUIDGenerator",
-    parameters = {
-        @Parameter(
-            name  = "uuid_gen_strategy_class",
-            value = "org.hibernate.id.uuid.CustomVersionOneStrategy"
-        )
-    }
-)
-private UUID id;
-```
-
-Version 1 UUIDs are time-ordered (using IP address instead of MAC address), which can be more index-friendly in databases.
-
-> Requires: Jakarta Persistence 3.1+ / Hibernate 6+. Not available in JPA 2.x.
-> The field type can be `java.util.UUID` (stored as `UUID` natively in PostgreSQL) or `String` (stored as `VARCHAR(36)`).
-
----
 
 ## Sequence Design Strategy: Global vs Per-Table
 
@@ -394,8 +273,6 @@ private Long id;
 - [Jakarta Persistence — @GeneratedValue](https://jakarta.ee/specifications/persistence/3.1/apidocs/jakarta.persistence/jakarta/persistence/generatedvalue)
 - [Hibernate 6.5 — Using IDENTITY columns](https://docs.hibernate.org/orm/6.5/userguide/html_single/#identifiers-generators-identity)
 - [Hibernate 6.5 — Using sequences](https://docs.hibernate.org/orm/6.5/userguide/html_single/#identifiers-generators-sequence)
-- [Hibernate 6.5 — Using table identifier generator](https://docs.hibernate.org/orm/6.5/userguide/html_single/#identifiers-generators-table)
-- [Hibernate 6.5 — Using AUTO](https://docs.hibernate.org/orm/6.5/userguide/html_single/#identifiers-generators-auto)
 - [PostgreSQL — CREATE SEQUENCE](https://www.postgresql.org/docs/17/sql-createsequence.html)
 - [Oracle — CREATE SEQUENCE](https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/CREATE-SEQUENCE.html)
-- [Vlad Mihalcea — Hibernate IDENTITY, SEQUENCE, and TABLE generators](https://vladmihalcea.com/hibernate-identity-sequence-and-table-sequence-generator/)
+- [Vlad Mihalcea — Hibernate IDENTITY and SEQUENCE generators](https://vladmihalcea.com/hibernate-identity-sequence-and-table-sequence-generator/)
