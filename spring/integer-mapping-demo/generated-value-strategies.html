@@ -8,31 +8,30 @@
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     line-height: 1.6;
     color: #333;
-    max-width: 800px;
+    max-width: 820px;
     margin: 40px auto;
     padding: 0 20px;
   }
   h1, h2, h3 {
     color: #111;
-    margin-top: 24px;
-    margin-bottom: 16px;
+    margin-top: 28px;
+    margin-bottom: 14px;
     font-weight: 600;
   }
-  h1 { border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
+  h1 { border-bottom: 2px solid #eaecef; padding-bottom: 0.3em; }
   h2 { border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
   table {
     border-collapse: collapse;
     width: 100%;
-    margin: 20px 0;
+    margin: 16px 0;
   }
   th, td {
     border: 1px solid #dfe2e5;
     padding: 8px 12px;
     text-align: left;
+    vertical-align: top;
   }
-  th {
-    background-color: #f6f8fa;
-  }
+  th { background-color: #f6f8fa; font-weight: 600; }
   pre {
     background-color: #f6f8fa;
     padding: 16px;
@@ -40,6 +39,7 @@
     overflow-x: auto;
     font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
     font-size: 85%;
+    line-height: 1.5;
   }
   code {
     background-color: rgba(27,31,35,0.05);
@@ -48,17 +48,18 @@
     font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
     font-size: 85%;
   }
-  pre code {
-    background-color: transparent;
-    padding: 0;
-  }
+  pre code { background-color: transparent; padding: 0; }
   blockquote {
     border-left: 0.25em solid #dfe2e5;
-    color: #6a737d;
+    color: #555;
     padding: 0.5em 1em;
-    margin: 20px 0;
+    margin: 16px 0;
     background-color: #fafbfc;
   }
+  blockquote strong { color: #333; }
+  hr { border: none; border-top: 1px solid #eaecef; margin: 28px 0; }
+  ul, ol { padding-left: 1.6em; }
+  li { margin-bottom: 4px; }
 </style>
 </head>
 <body>
@@ -142,37 +143,13 @@ INSERT INTO employee (id, name) VALUES (3, 'Carol');
 
 <h3>Under-the-Hood Differences: Oracle vs PostgreSQL</h3>
 
-<p>Both databases treat a <code>SEQUENCE</code> as a first-class database object. However, their syntax and caching model differ:</p>
-
 <table>
-  <thead>
-    <tr>
-      <th>Aspect</th>
-      <th>PostgreSQL</th>
-      <th>Oracle</th>
-    </tr>
-  </thead>
+  <thead><tr><th>Aspect</th><th>PostgreSQL</th><th>Oracle</th></tr></thead>
   <tbody>
-    <tr>
-      <td><strong>Get next value</strong></td>
-      <td><code>SELECT nextval('seq_name')</code></td>
-      <td><code>SELECT seq_name.NEXTVAL FROM DUAL</code></td>
-    </tr>
-    <tr>
-      <td><strong>Session cache</strong></td>
-      <td>Each session has its own cache — values can appear out-of-order across sessions</td>
-      <td>Shared pool cache — consistent across all sessions</td>
-    </tr>
-    <tr>
-      <td><strong>Auto-increment alternative</strong></td>
-      <td><code>SERIAL</code> / <code>BIGSERIAL</code> (backed by sequence)</td>
-      <td><code>GENERATED AS IDENTITY</code> (Oracle 12c+, also backed by sequence internally)</td>
-    </tr>
-    <tr>
-      <td><strong>Hibernate Dialect</strong></td>
-      <td><code>PostgreSQLDialect</code> auto-generates <code>nextval(...)</code></td>
-      <td><code>OracleDialect</code> auto-generates <code>.NEXTVAL</code></td>
-    </tr>
+    <tr><td><strong>Get next value</strong></td><td><code>SELECT nextval('seq_name')</code></td><td><code>SELECT seq_name.NEXTVAL FROM DUAL</code></td></tr>
+    <tr><td><strong>Session cache</strong></td><td>Each session has its own cache — values can appear out-of-order across sessions</td><td>Shared pool cache — consistent across all sessions</td></tr>
+    <tr><td><strong>Auto-increment alternative</strong></td><td><code>SERIAL</code> / <code>BIGSERIAL</code> (backed by sequence)</td><td><code>GENERATED AS IDENTITY</code> (Oracle 12c+, backed by sequence internally)</td></tr>
+    <tr><td><strong>Hibernate Dialect</strong></td><td><code>PostgreSQLDialect</code> auto-generates <code>nextval(...)</code></td><td><code>OracleDialect</code> auto-generates <code>.NEXTVAL</code></td></tr>
   </tbody>
 </table>
 
@@ -182,14 +159,12 @@ INSERT INTO employee (id, name) VALUES (3, 'Carol');
 
 <h3>Strategy 1: Global Sequence (One sequence shared across the entire DB)</h3>
 
-<p>When you use <code>GenerationType.AUTO</code> without specifying a custom <code>@SequenceGenerator</code>, Hibernate defaults to a single shared sequence — <code>hibernate_sequence</code> (Hibernate 5) or <code>seq_gen_sequence</code> (Hibernate 6) — used by <strong>every entity</strong> in the application.</p>
+<p>When you use <code>GenerationType.AUTO</code> without a custom <code>@SequenceGenerator</code>, Hibernate defaults to a single shared sequence — <code>hibernate_sequence</code> (Hibernate 5) or <code>seq_gen_sequence</code> (Hibernate 6) — used by <strong>every entity</strong>.</p>
 
 <pre><code>// No explicit generator — Hibernate picks a shared sequence
 @Id
 @GeneratedValue(strategy = GenerationType.AUTO)
 private Long id;</code></pre>
-
-<p><strong>What actually happens in the DB:</strong></p>
 
 <pre><code>-- Hibernate calls one shared sequence for ALL tables:
 SELECT nextval('hibernate_sequence');  -- User gets id=1
@@ -197,38 +172,19 @@ SELECT nextval('hibernate_sequence');  -- Order gets id=2
 SELECT nextval('hibernate_sequence');  -- User gets id=3
 SELECT nextval('hibernate_sequence');  -- Product gets id=4</code></pre>
 
-<p><strong>Trade-offs:</strong></p>
-
 <table>
   <tbody>
-    <tr>
-      <td>✅ <strong>Zero setup</strong></td>
-      <td>No <code>@SequenceGenerator</code> annotation needed on any entity</td>
-    </tr>
-    <tr>
-      <td>✅ <strong>Globally unique IDs</strong></td>
-      <td>No two rows across <em>any</em> table share the same ID — useful in some audit/event systems</td>
-    </tr>
-    <tr>
-      <td>❌ <strong>Confusing ID gaps per table</strong></td>
-      <td>User IDs: 1, 3, 7, ... Order IDs: 2, 4, 6, ... IDs look non-sequential within a table, making debugging and statistics harder</td>
-    </tr>
-    <tr>
-      <td>❌ <strong>Bottleneck at high concurrency</strong></td>
-      <td>All insert threads from all entity types contend for the same single sequence object</td>
-    </tr>
-    <tr>
-      <td>❌ <strong>Hard to reset</strong></td>
-      <td>If you truncate a table, you can't reset just that table's counter without affecting every other entity</td>
-    </tr>
+    <tr><td>✅ <strong>Zero setup</strong></td><td>No <code>@SequenceGenerator</code> annotation needed on any entity</td></tr>
+    <tr><td>✅ <strong>Globally unique IDs</strong></td><td>No two rows across <em>any</em> table share the same ID — useful in some audit/event systems</td></tr>
+    <tr><td>❌ <strong>Confusing ID gaps per table</strong></td><td>User IDs: 1, 3, 7, ... Order IDs: 2, 4, 6, ... Non-sequential per table, harder to debug</td></tr>
+    <tr><td>❌ <strong>Bottleneck at high concurrency</strong></td><td>All insert threads from all entity types contend for the same single sequence object</td></tr>
+    <tr><td>❌ <strong>Hard to reset</strong></td><td>Can't reset one table's counter without affecting every other entity</td></tr>
   </tbody>
 </table>
 
 <hr>
 
 <h3>Strategy 2: Per-Table Sequence (One dedicated sequence per table) — Recommended</h3>
-
-<p>Each entity declares its own <code>@SequenceGenerator</code> pointing to a <strong>dedicated sequence object</strong> in the DB. This is the standard pattern in enterprise applications.</p>
 
 <pre><code>// User entity — uses its own sequence
 @Entity
@@ -256,34 +212,18 @@ public class Order {
     private Long id;
 }</code></pre>
 
-<p><strong>What actually happens in the DB:</strong></p>
-
 <pre><code>-- Each table has its own independent counter:
 SELECT nextval('users_id_seq');    -- User gets id=1
 SELECT nextval('orders_id_seq');   -- Order gets id=1 (independent!)
 SELECT nextval('users_id_seq');    -- User gets id=2
 SELECT nextval('orders_id_seq');   -- Order gets id=2</code></pre>
 
-<p><strong>Trade-offs:</strong></p>
-
 <table>
   <tbody>
-    <tr>
-      <td>✅ <strong>Clean, sequential IDs per table</strong></td>
-      <td>Users: 1, 2, 3, 4 ... Orders: 1, 2, 3, 4 ... Easy to reason about</td>
-    </tr>
-    <tr>
-      <td>✅ <strong>Independent reset</strong></td>
-      <td><code>TRUNCATE users; ALTER SEQUENCE users_id_seq RESTART;</code> — doesn't affect any other table</td>
-    </tr>
-    <tr>
-      <td>✅ <strong>Better concurrency isolation</strong></td>
-      <td>High-volume insert on <code>orders</code> doesn't contend with inserts on <code>users</code></td>
-    </tr>
-    <tr>
-      <td>❌ <strong>More boilerplate</strong></td>
-      <td>Every entity needs its own <code>@SequenceGenerator</code> annotation</td>
-    </tr>
+    <tr><td>✅ <strong>Clean, sequential IDs per table</strong></td><td>Users: 1, 2, 3, 4 ... Orders: 1, 2, 3, 4 ... Easy to reason about</td></tr>
+    <tr><td>✅ <strong>Independent reset</strong></td><td><code>TRUNCATE users; ALTER SEQUENCE users_id_seq RESTART;</code> — doesn't affect any other table</td></tr>
+    <tr><td>✅ <strong>Better concurrency isolation</strong></td><td>High-volume insert on <code>orders</code> doesn't contend with inserts on <code>users</code></td></tr>
+    <tr><td>❌ <strong>More boilerplate</strong></td><td>Every entity needs its own <code>@SequenceGenerator</code> annotation</td></tr>
   </tbody>
 </table>
 
@@ -291,7 +231,7 @@ SELECT nextval('orders_id_seq');   -- Order gets id=2</code></pre>
 
 <h3>Aligning <code>allocationSize</code> with the DB Sequence Cache</h3>
 
-<p>This is a critical subtlety that many developers miss. Hibernate's <code>allocationSize</code> (app-level cache) and the DB sequence's <code>INCREMENT BY</code> / <code>CACHE</code> (DB-level cache) must be <strong>synchronized</strong>, or you will get ID conflicts or large gaps.</p>
+<p>Hibernate's <code>allocationSize</code> (app-level cache) and the DB sequence's <code>INCREMENT BY</code> / <code>CACHE</code> (DB-level cache) must be <strong>synchronized</strong>, or you will get ID conflicts or large gaps.</p>
 
 <pre><code>-- PostgreSQL: create the sequence to match Hibernate's allocationSize=50
 CREATE SEQUENCE users_id_seq
@@ -307,7 +247,7 @@ CREATE SEQUENCE users_id_seq
     NOCYCLE;</code></pre>
 
 <blockquote>
-  <strong>Why this matters:</strong> If Hibernate's <code>allocationSize=50</code> but the DB sequence <code>INCREMENT BY 1</code>, Hibernate thinks IDs 1–50 are reserved after fetching <code>nextval()=1</code>, but the DB only increments by 1. The next <code>nextval()</code> call returns 2, not 51 — causing <strong>duplicate ID conflicts</strong> and <code>DataIntegrityViolationException` errors under concurrent load.
+  <strong>Why this matters:</strong> If Hibernate's <code>allocationSize=50</code> but the DB sequence <code>INCREMENT BY 1</code>, Hibernate thinks IDs 1–50 are reserved after fetching <code>nextval()=1</code>, but the DB only increments by 1. The next <code>nextval()</code> call returns 2, not 51 — causing <strong>duplicate ID conflicts</strong> and <code>DataIntegrityViolationException</code> errors under concurrent load.
 </blockquote>
 
 <hr>
@@ -315,54 +255,16 @@ CREATE SEQUENCE users_id_seq
 <h2>IDENTITY vs SEQUENCE — Head-to-Head</h2>
 
 <table>
-  <thead>
-    <tr>
-      <th>Factor</th>
-      <th><code>IDENTITY</code></th>
-      <th><code>SEQUENCE</code></th>
-    </tr>
-  </thead>
+  <thead><tr><th>Factor</th><th><code>IDENTITY</code></th><th><code>SEQUENCE</code></th></tr></thead>
   <tbody>
-    <tr>
-      <td><strong>ID generated by</strong></td>
-      <td>Database (after INSERT)</td>
-      <td>Database sequence (before INSERT)</td>
-    </tr>
-    <tr>
-      <td><strong>Hibernate knows ID before INSERT?</strong></td>
-      <td>❌ No</td>
-      <td>✅ Yes</td>
-    </tr>
-    <tr>
-      <td><strong>JDBC Batch Insert support</strong></td>
-      <td>❌ Disabled</td>
-      <td>✅ Enabled</td>
-    </tr>
-    <tr>
-      <td><strong>DB round-trips per insert</strong></td>
-      <td>1 INSERT + 1 <code>getGeneratedKeys()</code></td>
-      <td>~1 per 50 inserts (with <code>allocationSize=50</code>)</td>
-    </tr>
-    <tr>
-      <td><strong>ID gaps possible?</strong></td>
-      <td>No (sequential per table)</td>
-      <td>Yes (gaps at app restart or rollback)</td>
-    </tr>
-    <tr>
-      <td><strong>DB support</strong></td>
-      <td>MySQL, PostgreSQL, SQL Server</td>
-      <td>PostgreSQL, Oracle, H2</td>
-    </tr>
-    <tr>
-      <td><strong>Config complexity</strong></td>
-      <td>✅ Zero (simplest)</td>
-      <td>Slightly more (<code>@SequenceGenerator</code> needed)</td>
-    </tr>
-    <tr>
-      <td><strong>Performance at high write volume</strong></td>
-      <td>❌ Slower</td>
-      <td>✅ Significantly faster</td>
-    </tr>
+    <tr><td><strong>ID generated by</strong></td><td>Database (after INSERT)</td><td>Database sequence (before INSERT)</td></tr>
+    <tr><td><strong>Hibernate knows ID before INSERT?</strong></td><td>❌ No</td><td>✅ Yes</td></tr>
+    <tr><td><strong>JDBC Batch Insert support</strong></td><td>❌ Disabled</td><td>✅ Enabled</td></tr>
+    <tr><td><strong>DB round-trips per insert</strong></td><td>1 INSERT + 1 <code>getGeneratedKeys()</code></td><td>~1 per 50 inserts (with <code>allocationSize=50</code>)</td></tr>
+    <tr><td><strong>ID gaps possible?</strong></td><td>No (sequential per table)</td><td>Yes (gaps at app restart or rollback)</td></tr>
+    <tr><td><strong>DB support</strong></td><td>MySQL, PostgreSQL, SQL Server</td><td>PostgreSQL, Oracle, H2</td></tr>
+    <tr><td><strong>Config complexity</strong></td><td>✅ Zero (simplest)</td><td>Slightly more (<code>@SequenceGenerator</code> needed)</td></tr>
+    <tr><td><strong>Performance at high write volume</strong></td><td>❌ Slower</td><td>✅ Significantly faster</td></tr>
   </tbody>
 </table>
 
@@ -407,8 +309,99 @@ private Long id;
 private Long id;</code></pre>
 
 <blockquote>
-  <strong>Rule of thumb:</strong> Start with <code>IDENTITY</code> for simplicity. Switch to <code>SEQUENCE</code> only when you observe write bottlenecks or need batch insert performance — it's an easy migration since it only changes the ID generation mechanism, not the column type (<code>BIGINT` stays `BIGINT</code>).
+  <strong>Rule of thumb:</strong> Start with <code>IDENTITY</code> for simplicity. Switch to <code>SEQUENCE</code> only when you observe write bottlenecks or need batch insert performance — it's an easy migration since it only changes the ID generation mechanism, not the column type (<code>BIGINT</code> stays <code>BIGINT</code>).
 </blockquote>
+
+<hr>
+
+<h2>Real-World Context: Why PMT Chose <code>IDENTITY</code> over <code>SEQUENCE</code></h2>
+
+<p>The <code>pmt</code> project (Spring Boot + PostgreSQL) uses <code>GenerationType.IDENTITY</code> for all entities via a shared <code>BaseEntity</code>. This section explains exactly why that choice was made over <code>SEQUENCE</code>, and how Hibernate's annotation maps to what PostgreSQL actually executes.</p>
+
+<h3>The DB Side: <code>GENERATED BY DEFAULT AS IDENTITY</code></h3>
+
+<p>All 8 tables define their primary key as a PostgreSQL <strong>identity column</strong>:</p>
+
+<pre><code>ALTER TABLE "USER"             ALTER COLUMN ID ADD GENERATED BY DEFAULT AS IDENTITY;
+ALTER TABLE "PROJECT"          ALTER COLUMN ID ADD GENERATED BY DEFAULT AS IDENTITY;
+ALTER TABLE "TICKET"           ALTER COLUMN ID ADD GENERATED BY DEFAULT AS IDENTITY;
+ALTER TABLE "TICKET_ACTIVITY"  ALTER COLUMN ID ADD GENERATED BY DEFAULT AS IDENTITY;
+-- ... same for CHAT_ROOM, CHAT_MESSAGE, AI_LOG, PROJECT_MEMBER</code></pre>
+
+<p><code>GENERATED BY DEFAULT AS IDENTITY</code> is the <strong>SQL Standard (SQL:2003)</strong> equivalent of <code>SERIAL</code>. Under the hood PostgreSQL still creates a hidden sequence object — but the syntax is portable and more explicit.</p>
+
+<table>
+  <thead><tr><th>Variant</th><th>Behavior</th></tr></thead>
+  <tbody>
+    <tr><td><code>GENERATED ALWAYS AS IDENTITY</code></td><td>DB always assigns the value. An explicit <code>INSERT INTO t (id) VALUES (5)</code> fails with an error.</td></tr>
+    <tr><td><code>GENERATED BY DEFAULT AS IDENTITY</code></td><td>DB generates by default, but you can override explicitly — useful when seeding data or resetting sequences after a migration.</td></tr>
+  </tbody>
+</table>
+
+<h3>The Hibernate Side: <code>BaseEntity</code></h3>
+
+<p>All entities in <code>pmt</code> extend a single <code>@MappedSuperclass</code> that wires up the annotation:</p>
+
+<pre><code>@MappedSuperclass
+public abstract class BaseEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)  // DB assigns this after INSERT
+    @Column(name = "ID", columnDefinition = "INTEGER")
+    private Integer id;  // INT (4 bytes) — sufficient for a PM tool
+
+    @CreationTimestamp
+    @Column(name = "CREATED_AT", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+}</code></pre>
+
+<p>When <code>GenerationType.IDENTITY</code> is set, the full sequence of events for a single <code>save()</code> is:</p>
+
+<pre><code>ticketRepository.save(newTicket)
+  │
+  ├─ Hibernate: ID is not set → strategy = IDENTITY → must INSERT immediately (no pre-fetch)
+  │
+  ├─ SQL sent:
+  │   INSERT INTO "TICKET" (PROJECT_ID, TITLE, STATUS, ...) VALUES (1, 'Fix login bug', 'OPEN', ...)
+  │   (notice: no ID column in the statement)
+  │
+  ├─ PostgreSQL: identity sequence fires → assigns id = 43 automatically
+  │
+  └─ Hibernate: calls Statement#getGeneratedKeys() → reads 43 → sets ticket.id = 43</code></pre>
+
+<p>Compare with what <code>SEQUENCE</code> would do instead:</p>
+
+<pre><code>ticketRepository.save(newTicket)
+  │
+  ├─ Hibernate: ID is not set → strategy = SEQUENCE → call sequence FIRST
+  │
+  ├─ SQL: SELECT nextval('ticket_id_seq')  →  returns 43
+  │
+  ├─ Hibernate: sets ticket.id = 43 BEFORE the INSERT
+  │
+  └─ SQL: INSERT INTO "TICKET" (ID, PROJECT_ID, TITLE, ...) VALUES (43, 1, 'Fix login bug', ...)</code></pre>
+
+<h3>Why IDENTITY and not SEQUENCE for pmt?</h3>
+
+<p><strong>1. Write volume is human-paced, not machine-paced.</strong></p>
+<p>pmt is a collaboration tool. Users create tickets, send messages, and add members one action at a time — there are no bulk-insert batch jobs, no event-sourcing pipelines, no data imports. The primary performance advantage of <code>SEQUENCE</code> (enabling JDBC batch INSERTs) simply never activates in this workload.</p>
+
+<p><strong>2. Zero annotation boilerplate — one base class for all 8 tables.</strong></p>
+<p>With <code>SEQUENCE</code>, every entity needs its own <code>@SequenceGenerator</code> binding:</p>
+<pre><code>// Must be repeated for Ticket, User, Project, ChatMessage, ...
+@GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "ticket_seq")
+@SequenceGenerator(name = "ticket_seq", sequenceName = "ticket_id_seq", allocationSize = 50)
+private Integer id;</code></pre>
+<p>With <code>IDENTITY</code>, the declaration lives once in <code>BaseEntity</code> — all 8 entities inherit it with zero extra annotations.</p>
+
+<p><strong>3. <code>IDENTITY</code> is the exact behavioral match for <code>GENERATED BY DEFAULT AS IDENTITY</code>.</strong></p>
+<p>Hibernate's <code>GenerationType.IDENTITY</code> tells it: <em>"do not generate or pre-fetch the ID — let the DB column handle it after INSERT"</em>. This directly corresponds to how PostgreSQL identity columns work. Using <code>SEQUENCE</code> here would mean Hibernate calls <code>nextval()</code> manually, bypassing the column's built-in identity sequence — adding unnecessary complexity.</p>
+
+<p><strong>4. <code>Integer</code> (4 bytes) is correctly sized for the domain.</strong></p>
+<p><code>Integer</code> maps to PostgreSQL <code>INT</code> (up to ~2.1 billion rows). For a project management tool, this ceiling will never be hit. Using <code>Long</code> (8 bytes) would double the storage cost for every PK and FK column across all 8 tables for no practical gain.</p>
+
+<p><strong>5. ID gaps from <code>SEQUENCE</code> pre-allocation are undesirable.</strong></p>
+<p><code>SEQUENCE</code> with <code>allocationSize=50</code> discards the pre-fetched block on every application restart. In development and CI/CD with frequent restarts, IDs would jump in gaps of 50 — making the database harder to inspect and debug. With <code>IDENTITY</code>, IDs are always strictly sequential per table.</p>
 
 <hr>
 
