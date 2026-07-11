@@ -48,149 +48,188 @@ It includes several monitoring utilities:
 
 ## 2. Architecture: How Sysstat Works
 
-Sysstat operates entirely by reading kernel performance counters exposed via the `/proc` and `/sys` virtual filesystems, then aggregating and formatting them to make them human-readable. **Sysstat does not implement any performance metric collection logic itself; it is a presentation and scheduling wrapper around raw kernel metrics.**
+Linux maintains cumulative performance counters and exposes most of them through the `/proc` and `/sys` virtual filesystems. Sysstat does not instrument the kernel or create those counters. Its utilities implement the user-space logic that reads and samples them, calculates rates and averages, stores activity records, and formats reports.
+
+There are two main data paths:
+
+- **Live reporting:** `iostat`, `mpstat`, and `pidstat` read current kernel counters directly. For a live `sar` report, `sar` invokes its `sadc` backend to collect samples.
+- **Historical reporting:** A scheduler runs `sa1`, which invokes `sadc` and appends binary activity records to a daily file. Later, `sar` or `sadf` reads that file without querying the live kernel.
 
 ```mermaid
-graph TD
-    K[Linux Kernel /proc & /sys] -->|Reads counters| SADC[sadc - Data Collector]
-    K -->|Direct reads| IO[iostat]
-    K -->|Direct reads| MP[mpstat]
-    K -->|Direct reads| PID[pidstat]
-    
-    SADC -->|Writes compressed binary| LOGS[Binary Logs: /var/log/sysstat/saDD]
-    LOGS -->|Parses files| SAR[sar - System Activity Reporter]
-    K -->|Direct reads / real-time| SAR
+flowchart TD
+    K[Linux kernel counters<br/>/proc and /sys]
+    K -->|Direct sampling| IO[iostat]
+    K -->|Direct sampling| MP[mpstat]
+    K -->|Per-task sampling| PID[pidstat]
+    SAR[sar] -->|Live collection request| SADC[sadc collector]
+    K -->|Reads and samples counters| SADC
+    TIMER[systemd timer or cron] --> SA1[sa1 wrapper]
+    SA1 --> SADC
+    SADC -->|Writes binary activity records| LOGS[Daily sa activity file]
+    LOGS -->|Historical input| SAR
+    LOGS -->|Historical input and export| SADF[sadf]
+    TIMER --> SA2[sa2 wrapper]
+    SA2 -->|Invokes sar| SAR
 ```
 
-1. **Metric Exposure (Virtual Filesystems):** The Linux kernel maintains performance counters dynamically in memory and exposes them as text files in the `/proc` and `/sys` virtual filesystems. Sysstat tools parse these files:
-    - **CPU Utilization:** Read from `/proc/stat` (CPU ticks spent in user, system, idle, iowait, etc.).
-    - **Memory & Swap:** Read from `/proc/meminfo` (detailed RAM metrics) and `/proc/vmstat` (page/swap counters).
-    - **Disk I/O:** Read from `/proc/diskstats` (sectors read/written, I/O time, etc.) and `/sys/block/` (device partition queues).
-    - **Network Activity:** Read from `/proc/net/dev` (bytes/packets sent/received per interface).
-    - **Process-level Resource Usage:** Read from `/proc/<PID>/stat` (CPU/memory), `/proc/<PID>/io` (disk reads/writes), and `/proc/<PID>/status` (FDs, threads).
-    - **System Pressure (PSI):** Read from `/proc/pressure/cpu`, `/proc/pressure/io`, and `/proc/pressure/memory`.
-2. **Collection (`sadc` via `sa1`):** The binary utility `sadc` (System Activity Data Collector) queries these files. It is not designed to be run directly by users; instead, it is wrapped by the `sa1` script which is triggered automatically.
-3. **Scheduling (systemd or Cron):** A background scheduling system (like systemd timers or cron) executes the collection scripts periodically.
-    - `sysstat-collect.timer` runs `sysstat-collect.service` (which calls `sa1`) every 10 minutes to write to `/var/log/sysstat/saDD` (where `DD` represents the day of the month).
-    - `sysstat-summary.timer` runs `sysstat-summary.service` once a day (which calls `sa2`) to convert the binary log into a human-readable text file `/var/log/sysstat/sarDD`.
-4. **Reporting (`sar`, `iostat`, `mpstat`, `pidstat`):** Users query the collected data. Tools like `iostat` and `mpstat` read `/proc` directly for instant real-time visualization, whereas `sar` can query either the live kernel or parse historical binary log archives using the `-f` flag.
+1. **Kernel counter exposure:** Common sources include `/proc/stat` for CPU time, `/proc/meminfo` and `/proc/vmstat` for memory and virtual memory, `/proc/diskstats` and `/sys` for device I/O, `/proc/net/dev` for network interfaces, `/proc/<PID>/...` for per-task data, and `/proc/pressure/...` for Pressure Stall Information (PSI). These are representative sources; available statistics depend on the kernel and enabled interfaces.
+2. **Collection (`sadc` and `sa1`):** `sadc` samples counters and writes binary records. Administrators normally schedule the `sa1` wrapper. Some activities are optional; settings such as `SADC_OPTIONS="-S DISK"`, `-S ALL`, or `-S XALL` determine which additional statistics are stored.
+3. **Scheduling (systemd or cron):** Packages may install systemd units such as `sysstat-collect.timer` and `sysstat-summary.timer`, cron entries, or both. A ten-minute interval is common, but unit names, schedules, paths, and activation defaults are distribution-specific.
+4. **Storage and rotation:** Daily files are normally named `saDD` or `saYYYYMMDD`. Active files are binary but are not necessarily compressed. Retention settings may compress older files. `sa2` can generate an optional, human-readable `sarDD` report; this text summary is not the source used for normal historical queries.
+5. **Reporting (`sar` and `sadf`):** `sar -f FILE` reads historical records. `sadf` can export them as CSV, JSON, XML, or SVG. Use `sar --sadc` to verify which collector a particular `sar` binary invokes for live collection.
 
 ---
 
 ## 3. Installation and Basic Configuration
 
-### 3.1 Installation
+### 3.1 Install from Distribution Packages
 
-Install Sysstat using your system's package manager:
-
-**On Debian / Ubuntu / Linux Mint:**
+**Debian, Ubuntu, and Linux Mint:**
 
 ```bash
 sudo apt update
 sudo apt install sysstat
 ```
 
-**On RHEL / Rocky Linux / Fedora / AlmaLinux:**
+**RHEL, Rocky Linux, Fedora, and AlmaLinux:**
 
 ```bash
 sudo dnf install sysstat
 ```
 
-### 3.2 Configuration (Debian/Ubuntu Specific)
+Confirm the installed version and command locations:
 
-By default, Debian-based distributions disable the background collection service to save a negligible amount of disk space and resource overhead.
+```bash
+sar -V
+command -v sar iostat mpstat pidstat
+```
 
-The easiest and officially recommended way to enable it is via the package configuration tool:
+### 3.2 Enable Collection on Debian, Ubuntu, and Linux Mint
+
+Debian-family packages commonly install Sysstat with automatic historical collection disabled. Enable it through the package configuration interface:
 
 ```bash
 sudo dpkg-reconfigure sysstat
 ```
 
-*(Select "Yes" when prompted if sysstat should be enabled).*
-
-Alternatively, you can manually edit the configuration file:
-
-```bash
-sudo nano /etc/default/sysstat
-```
-
-And change the `ENABLED` value from `false` to `true`:
+Select **Yes** when asked whether system activity collection should be enabled. Alternatively, edit `/etc/default/sysstat` and set:
 
 ```ini
-# /etc/default/sysstat
 ENABLED="true"
 ```
 
-Finally, ensure the services are enabled and started:
+After a manual change, restart the main service:
 
 ```bash
-sudo systemctl enable --now sysstat
+sudo systemctl restart sysstat
+```
+
+Unit availability varies by package release. Inspect the installed units:
+
+```bash
+systemctl list-unit-files 'sysstat*'
+systemctl list-timers 'sysstat*'
+```
+
+If the collection and summary timers exist but are inactive, enable them:
+
+```bash
 sudo systemctl enable --now sysstat-collect.timer
 sudo systemctl enable --now sysstat-summary.timer
 ```
 
-### 3.3 Log Locations
+### 3.3 Enable Collection on RHEL-Family Distributions
 
-- **Debian/Ubuntu:** `/var/log/sysstat/`
+Recent RHEL-family packages generally use the `sysstat` service:
 
-- **RHEL/CentOS/Fedora:** `/var/log/sa/`
+```bash
+sudo systemctl enable --now sysstat
+systemctl status sysstat --no-pager
+```
 
-Inside these folders, you will find files named:
+Depending on the release, settings may be in `/etc/sysconfig/sysstat`, `/etc/sysconfig/sysstat.ioconf`, a cron file, or systemd units. Inspect the active installation rather than copying paths from another distribution:
 
-- `saDD`: Binary data files (can only be read using `sar` or `sadf`).
-- `sarDD`: Text-based summary reports generated daily.
+```bash
+systemctl list-unit-files 'sysstat*'
+systemctl list-timers 'sysstat*'
+systemctl cat sysstat 2>/dev/null
+```
 
-### 3.4 Compiling and Running from Source (Local / No Installation)
+### 3.4 Configure Collection and Retention
 
-If you don't want to install `sysstat` system-wide (or don't have root privileges), you can compile and run it directly within the source directory:
+Configuration paths are distribution-specific. Common settings include:
 
-1. **Configure and Build:**
+- `SADC_OPTIONS`: Optional activities stored in new daily files. `-S DISK` includes disk statistics, `-S ALL` includes all standard optional activities, and `-S XALL` also includes extended disk, partition, and filesystem statistics.
+- `HISTORY`: Number of days for which activity files are retained.
+- `COMPRESSAFTER`: Age at which old activity files may be compressed.
+- `SA_DIR`: Activity-file directory, when exposed by the package configuration.
 
-   ```bash
-   ./configure
-   make
-   ```
+The activities already stored in an existing file take precedence when `sadc` appends new records. A changed `SADC_OPTIONS` value therefore takes full effect with a newly created daily file.
 
-2. **Run Standalone Tools Directly:**
-   Standalone tools like `iostat`, `mpstat`, and `pidstat` can be run locally in this folder:
+Before changing a collection interval, inspect the installed timer:
 
-   ```bash
-   ./iostat 1 5
-   ./mpstat 1 5
-   ./pidstat 1 5
-   ```
+```bash
+systemctl cat sysstat-collect.timer
+systemctl list-timers sysstat-collect.timer
+```
 
-3. **Run `sar` with PATH Override:**
-   Under the hood, `sar` automatically runs the `sadc` collector tool. Because it's not installed on the system, `sar` will fail to find `sadc` at the default `/usr/local/lib/sa/sadc` path. You must prepend the current directory to your `PATH` environment variable so `sar` can find it locally:
+Use `sudo systemctl edit sysstat-collect.timer` to create a drop-in instead of editing the vendor unit. If the timer uses `OnCalendar`, reset the existing value with an empty `OnCalendar=` assignment before adding the new schedule. Confirm the merged result with `systemctl cat sysstat-collect.timer`.
 
-   ```bash
-   PATH=.:$PATH ./sar 1 5
-   ```
+### 3.5 Log Locations
 
-4. **Test Mode (Virtual `/proc` Path Redirection):**
-   In the source code, `/proc` and `/sys` path references are prefixed with a macro `PRE` defined in `systest.h`.
-   - **Normal Compilation:** `PRE` is defined as `""` (empty string), so it reads live metrics directly from `/proc` and `/sys`.
-   - **Unit Test Compilation (`#ifdef TEST`):** `PRE` is defined as `"./tests/root"`. This redirects all `/proc` and `/sys` reads to mock test files under `./tests/root/proc/...` and `./tests/root/sys/...` so the test suite can validate correct parsing logic.
-5. **Local Background Scheduling (No `sudo` / User-level Cron):**
-   If you want to automate periodic metric collection locally under your own user account without using `sudo` or modifying system-level directories:
-   - Open your user-level crontab editor:
+- **Debian/Ubuntu default:** `/var/log/sysstat/`
+- **RHEL-family default:** `/var/log/sa/`
 
-     ```bash
-     crontab -e
-     ```
+Common filenames are:
 
-   - Add a cron entry targeting the compiled `sadc` binary in your local build folder. Make sure to point the log output to a directory where your user has write permissions (e.g. your home directory) instead of the system-wide `/var/log/sa/`:
+- `saDD` or `saYYYYMMDD`: Binary activity files read with `sar` or `sadf`.
+- `sarDD` or `sarYYYYMMDD`: Optional text summaries generated by `sa2`.
 
-     ```cron
-     # Run local sadc every 10 minutes to collect 1 sample and write to a local log file
-     */10 * * * * /absolute/path/to/sysstat/sadc 1 1 /home/your_username/sysstat_local_data
-     ```
+Confirm the actual location from the installed service or configuration rather than relying only on these defaults:
 
-   - You can inspect these locally-scheduled logs at any time using your local `sar` tool:
+```bash
+systemctl cat sysstat-collect.service 2>/dev/null
+```
 
-     ```bash
-     ./sar -f /home/your_username/sysstat_local_data
-     ```
+### 3.6 Verify Historical Collection
+
+Most rate reports require at least two samples. Check the scheduler, wait for another collection interval if necessary, and then query the current activity file:
+
+```bash
+systemctl list-timers 'sysstat*'
+sar --sadc
+sar -u
+sar -d
+```
+
+If `sar -d` says the requested activity is unavailable, verify that disk collection is enabled in `SADC_OPTIONS`. Also ensure that `sar --sadc` points to a `sadc` binary from the same Sysstat release.
+
+### 3.7 Build and Install from Source
+
+Prefer distribution packages for managed servers because they include distribution-specific services, paths, rotation, and retention configuration. To build and install upstream Sysstat:
+
+```bash
+./configure
+make
+sudo make install
+```
+
+Use `./configure --help` to review installation directories and scheduling options. Upstream also provides `./iconfig` for interactive configuration. To request installation of scheduled collection files:
+
+```bash
+./configure --enable-install-cron
+make
+sudo make install
+```
+
+Despite the option name, the resulting installation may use cron or systemd depending on the detected build environment. Verify the installed pair afterward:
+
+```bash
+sar -V
+sar --sadc
+```
+
+Do not mix a locally built `sar` with a different installed `sadc`. `sar` may search compiled-in collector directories before the current directory or `PATH`; a version mismatch can make an activity file unreadable or produce an inconsistent-data error.
 
 ---
 
