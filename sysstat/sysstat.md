@@ -62,12 +62,12 @@ flowchart TD
     K -->|Direct sampling| MP[mpstat]
     K -->|Per-task sampling| PID[pidstat]
     SAR[sar] -->|Live collection request| SADC[sadc collector]
-    K -->|Reads and samples counters| SADC
-    TIMER[systemd timer or cron] --> SA1[sa1 wrapper]
+    K -->|Counters read & sampled| SADC
+    TIMER[systemd timer or cron job] --> SA1[sa1 wrapper]
     SA1 --> SADC
     SADC -->|Writes binary activity records| LOGS[Daily sa activity file]
     LOGS -->|Historical input| SAR
-    LOGS -->|Historical input and export| SADF[sadf]
+    LOGS -->|Historical input for export| SADF[sadf]
     TIMER --> SA2[sa2 wrapper]
     SA2 -->|Invokes sar| SAR
 ```
