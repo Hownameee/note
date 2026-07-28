@@ -15,6 +15,11 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Demo API route
+app.get('/api/demo', (req, res) => {
+  res.json({ message: 'hello world' });
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`Note Server listening on port ${PORT}`);
