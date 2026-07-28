@@ -1,0 +1,44 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  demo-pipeline:
+    name: Simple Demo Pipeline
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Step 1 - Initialization
+        run: |
+          echo "Executing Step 1: Initializing pipeline..."
+          sleep 2
+
+      - name: Step 2 - Build
+        run: |
+          echo "Executing Step 2: Building project..."
+          sleep 3
+
+      - name: Step 3 - Test
+        run: |
+          echo "Executing Step 3: Running tests..."
+          sleep 3
+
+      - name: Step 4 - Completion
+        run: |
+          echo "Executing Step 4: Pipeline completed successfully!"
