@@ -15,6 +15,11 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Hello World route
+app.get('/hello', (req, res) => {
+  res.send('Hello World');
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`Note Server listening on port ${PORT}`);
